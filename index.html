@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Atlassian system design — speak notes</title>
+  <style>
+    :root {
+      --bg: #f4f0e6;
+      --ink: #1c1915;
+      --muted: #5c564c;
+      --line: #e2d9c8;
+      --card: #fffdf8;
+      --ask: #8a4b00;
+      --ask-bg: #fff6e8;
+      --say: #0f4c6e;
+      --say-bg: #f3f8fb;
+      --pick: #1d4d32;
+      --pick-bg: #eef6f0;
+      --warn: #6b3a3a;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font: 17px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      overflow-wrap: anywhere;
+      padding:
+        env(safe-area-inset-top)
+        env(safe-area-inset-right)
+        env(safe-area-inset-bottom)
+        env(safe-area-inset-left);
+    }
+    header, main, footer, .tabs-inner {
+      width: min(920px, calc(100% - 28px));
+      margin: 0 auto;
+    }
+    header { padding: 28px 0 8px; }
+    h1 { font-size: 28px; line-height: 1.2; margin: 0 0 8px; }
+    .lede { color: var(--muted); margin: 0 0 16px; max-width: 68ch; }
+    .open {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 0 0 18px;
+    }
+    .open p { margin: 0; }
+    .kicker {
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .tabs {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      background: color-mix(in srgb, var(--bg) 92%, white);
+      backdrop-filter: blur(8px);
+      padding: 8px 0 10px;
+      border-bottom: 1px solid var(--line);
+    }
+    .group {
+      margin: 8px 0 4px;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    [role="tablist"] {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 8px;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 2px;
+    }
+    [role="tablist"]::-webkit-scrollbar { display: none; }
+    [role="tab"] {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--ink);
+      border-radius: 999px;
+      min-height: 44px;
+      padding: 8px 14px;
+      font: inherit;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    [role="tab"][aria-selected="true"] {
+      background: var(--ink);
+      color: #f6f1e6;
+      border-color: var(--ink);
+    }
+    [role="tab"]:focus-visible, a:focus-visible, abbr:focus-visible {
+      outline: 2px solid var(--say);
+      outline-offset: 2px;
+    }
+    article[hidden] { display: none; }
+    article {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 22px 22px 8px;
+      margin: 18px 0 40px;
+    }
+    h2 { font-size: 26px; margin: 0 0 6px; }
+    .prompt { color: var(--muted); margin: 0 0 14px; }
+    .phases {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 12px;
+      margin: 0 -4px 8px;
+      position: sticky;
+      top: var(--tabs-h, 112px);
+      background: var(--card);
+      padding: 8px 4px;
+      z-index: 2;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .phases::-webkit-scrollbar { display: none; }
+    .phases a {
+      flex: 0 0 auto;
+      color: var(--say);
+      font-size: 14px;
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      text-decoration: none;
+      border-bottom: 1px solid transparent;
+    }
+    .phases a:hover { border-bottom-color: var(--say); }
+    h3 {
+      font-size: 18px;
+      margin: 22px 0 4px;
+      scroll-margin-top: calc(var(--tabs-h, 112px) + 56px);
+    }
+    .when { color: var(--muted); font-size: 14px; margin: 0 0 8px; }
+    h4 { font-size: 14px; margin: 14px 0 6px; letter-spacing: 0.02em; }
+    h4.ask { color: var(--ask); }
+    h4.say { color: var(--say); }
+    ol, ul { margin: 0 0 10px; padding-left: 1.2rem; }
+    li { margin: 0 0 6px; }
+    li::marker { color: var(--muted); }
+    .ask-list { background: var(--ask-bg); border-radius: 10px; padding: 10px 10px 4px 2rem; }
+    .say-list { background: var(--say-bg); border-radius: 10px; padding: 10px 10px 4px 2rem; }
+    .assume, .pick {
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin: 8px 0 12px;
+    }
+    .assume { background: #f7f4ee; }
+    .pick { background: var(--pick-bg); color: var(--pick); }
+    .assume p, .pick p { margin: 0 0 6px; }
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      margin: 8px 0 12px;
+    }
+    .flow b {
+      font-weight: 600;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 14px;
+    }
+    .flow i { color: var(--muted); font-style: normal; }
+    footer {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 72px;
+    }
+    footer a { color: var(--say); }
+    abbr[data-tip] {
+      text-decoration: underline dotted;
+      text-underline-offset: 3px;
+      cursor: help;
+    }
+    #tip-bar {
+      position: fixed;
+      z-index: 8;
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      bottom: max(12px, env(safe-area-inset-bottom));
+      margin: 0 auto;
+      width: min(560px, calc(100% - 24px));
+      background: var(--ink);
+      color: #f6f1e6;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 15px;
+      line-height: 1.35;
+      box-shadow: 0 8px 24px rgba(28, 25, 21, 0.28);
+    }
+    #tip-bar[hidden] { display: none; }
+    @media (max-width: 720px) {
+      body { font-size: 16px; }
+      header { padding-top: 16px; }
+      h1 { font-size: 22px; }
+      h2 { font-size: 22px; }
+      article {
+        padding: 16px 14px 4px;
+        border-radius: 12px;
+        margin-top: 12px;
+      }
+      .lede, .prompt, .when { font-size: 15px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>System design, as I would say it</h1>
+    <p class="lede">One problem per tab. I ask one question, wait, and note the answer. Then I speak the lines under it. Tap an abbreviation for the full form. The minute marks are a soft guide, not a clock to chase. Swipe the tabs sideways on a phone.</p>
+    <div class="open">
+      <p class="kicker">Once, at the start of the round</p>
+      <p>I'll structure this as requirements and approach, then API and schema, component design and scalability, scale-up and failures, and a short wrap-up with tradeoffs. If I go too deep anywhere, please interrupt me. I want all five steps inside the hour.</p>
+    </div>
+  </header>
+  <div class="tabs">
+    <div class="tabs-inner">
+      <p class="group" id="group-round">From this round</p>
+      <div role="tablist" aria-labelledby="group-round">
+        <button role="tab" id="tab-widget" aria-controls="panel-widget" aria-selected="true" tabindex="0">Widget platform</button>
+        <button role="tab" id="tab-library" aria-controls="panel-library" aria-selected="false" tabindex="-1">Component library</button>
+        <button role="tab" id="tab-editor" aria-controls="panel-editor" aria-selected="false" tabindex="-1">Collaborative editor</button>
+        <button role="tab" id="tab-messenger" aria-controls="panel-messenger" aria-selected="false" tabindex="-1">Messenger</button>
+        <button role="tab" id="tab-cookie" aria-controls="panel-cookie" aria-selected="false" tabindex="-1">Cookie banner</button>
+      </div>
+      <p class="group" id="group-also">Also common at Atlassian</p>
+      <div role="tablist" aria-labelledby="group-also">
+        <button role="tab" id="tab-board" aria-controls="panel-board" aria-selected="false" tabindex="-1">Jira board</button>
+        <button role="tab" id="tab-search" aria-controls="panel-search" aria-selected="false" tabindex="-1">Permissioned search</button>
+        <button role="tab" id="tab-inbox" aria-controls="panel-inbox" aria-selected="false" tabindex="-1">Notification center</button>
+        <button role="tab" id="tab-feed" aria-controls="panel-feed" aria-selected="false" tabindex="-1">Confluence feed</button>
+        <button role="tab" id="tab-mention" aria-controls="panel-mention" aria-selected="false" tabindex="-1">Mentions</button>
+      </div>
+    </div>
+  </div>
+  <main>
+    <article id="panel-widget" role="tabpanel" aria-labelledby="tab-widget">
+      <h2>Widget platform</h2>
+      <p class="prompt">Interviewer: design a widget. I treat it as a platform: hosts such as a Confluence page or a Jira issue run widgets built by us, partners, or a customer.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#widget-req">Requirements</a>
+        <a href="#widget-api">API</a>
+        <a href="#widget-comp">Components</a>
+        <a href="#widget-scale">Scale</a>
+        <a href="#widget-wrap">Wrap-up</a>
+      </nav>
+
+      <h3 id="widget-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes. I stay here until we agree the approach.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>Who builds a widget: our teams, marketplace partners, or a customer's own developers?</li>
+        <li>Where does it render: inside our products, on a third-party site, or both?</li>
+        <li>What may a widget do: show data, write back, open dialogs, or only display?</li>
+        <li>What scale should I design for: widgets per page, installs per tenant, and daily active users?</li>
+        <li>Does the widget act as the signed-in user, and which permissions can it hold?</li>
+        <li>Any hard bars for accessibility, internationalization, latency, or offline use?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>Partners install a widget onto a page inside our product.</li>
+          <li>A page can hold several widgets. Most are read-only. A few can write through our API.</li>
+          <li>The widget must not read the host page, the session cookie, or another widget.</li>
+          <li>Target: a large tenant, tens of widgets on a busy page, p95 interaction under two hundred milliseconds once loaded.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>A widget is a versioned bundle plus a manifest, installed on a host surface, rendered for the current user.</li>
+        <li>The host owns navigation, theming, and permissions. The widget owns its own UI.</li>
+        <li>I would support view, resize, and a small set of host actions such as a toast or a dialog. I would not give it the DOM.</li>
+        <li>Non-functional: isolation, a performance budget per widget, accessibility on both sides of the frame, and a kill switch per version.</li>
+        <li>Edge cases: a widget that hangs, a widget that asks for a permission the user does not have, a resize loop, and a host navigating away mid-call.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>Same-origin script: fast and easy to theme, and one bug or one malicious widget can read the whole page. I would not ship that for partners.</li>
+        <li>Sandboxed iframe plus a message bridge: slower to start, and the host stays safe. Theming comes in as tokens, not shared CSS.</li>
+      </ul>
+      <div class="pick"><p>I would pick the sandbox. Does that match the threat model you want, before I go into the API?</p></div>
+
+      <h3 id="widget-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is this read-heavy, with a few writes, or do widgets mutate host data often?</li>
+        <li>Do widgets need live updates, or is a fresh load enough?</li>
+        <li>Should a widget keep working on a flaky network?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Manifest: id, semantic version, bundle URL, permissions asked, and the sandbox flags.</li>
+        <li>Installation: host id, widget id, pinned version, and the admin's config.</li>
+        <li>Session: a short-lived token scoped to this user, this install, and these permissions. Not the user's cookie.</li>
+        <li>I would load the manifest and the session over REST. Live data, if we need it, is SSE from the host, not a socket per widget.</li>
+        <li>Writes carry an idempotency key. A retry must not double-apply.</li>
+        <li>Errors are a code plus a message the host can show. The widget never renders a raw stack.</li>
+        <li>Lists inside a widget are cursor-paginated. I would not let a widget pull an unbounded feed into the frame.</li>
+        <li>The bridge messages are typed: ready, resize, request, and result. I check the target origin on every message.</li>
+      </ul>
+
+      <h3 id="widget-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two. This is the long drawing section.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is the host one app, or several products sharing one widget runtime?</li>
+        <li>Do we already have a design system the widget should consume as tokens?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>Host page</b><i>→</i><b>Widget slots</b><i>→</i><b>Bridge</b><i>→</i><b>Sandboxed iframe</b><i>→</i><b>BFF</b><i>→</i><b>Product APIs</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: the page never shares its DOM with the widget. The bridge is the only door.</li>
+        <li>I lazy-mount a widget when it nears the viewport, and I cap how many frames are live.</li>
+        <li>I would not set both allow-scripts and allow-same-origin. Together they weaken the sandbox.</li>
+        <li>State split: the host holds install and theme. The widget holds its own view state inside the frame.</li>
+        <li>Cache: manifest and bundle on the CDN, session token in memory only, host config in memory with a short TTL.</li>
+        <li>A feature flag can disable one widget version without a host deploy. The slot then shows a quiet fallback.</li>
+        <li>The bottleneck is memory and long tasks from many frames. The budget is bundle size plus a long-task limit.</li>
+        <li>I would watch load time, bridge errors, and crash rate per widget version, with an SLO on host-page INP.</li>
+      </ul>
+
+      <h3 id="widget-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>At ten times the widgets, I virtualize slots and unload frames that scroll far away.</li>
+        <li>If the BFF is down, installed widgets still render from the cached bundle and show stale data, clearly labeled.</li>
+        <li>One widget throwing is an error boundary around that slot. The page stays up.</li>
+        <li>A hot widget version can be killed by flag. Clients stop requesting that bundle.</li>
+        <li>I retry bridge calls with jitter, and I stop after a small budget so a loop cannot pin the CPU.</li>
+      </ul>
+
+      <h3 id="widget-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>We are hosting untrusted UI inside a trusted page, so isolation comes before features.</li>
+        <li>The design is a sandboxed frame, a typed bridge, and a short-lived scoped token.</li>
+        <li>We give up a bit of startup time and shared CSS, and we keep the host safe.</li>
+        <li>I would roll a widget version out behind a flag and watch crash rate and host INP before it is default.</li>
+      </ul>
+    </article>
+
+    <article id="panel-library" role="tabpanel" aria-labelledby="tab-library" hidden>
+      <h2>UI component library</h2>
+      <p class="prompt">Interviewer: design a UI component library for our product teams.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#library-req">Requirements</a>
+        <a href="#library-api">API</a>
+        <a href="#library-comp">Components</a>
+        <a href="#library-scale">Scale</a>
+        <a href="#library-wrap">Wrap-up</a>
+      </nav>
+      <h3 id="library-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>Who consumes it: web only, or also mobile and email?</li>
+        <li>How many teams, and can a team fork a component or only contribute upstream?</li>
+        <li>Is theming one brand, or several products on the same components?</li>
+        <li>What is the accessibility bar, and do we support right-to-left and multiple languages?</li>
+        <li>Must components render on the server, and what is the bundle budget?</li>
+        <li>How painful may a breaking change be?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>Web only, many product teams, one brand with theming tokens for density and color mode.</li>
+          <li>Components must work with server rendering. No window access at import time.</li>
+          <li>Accessibility is WCAG AA, keyboard and screen reader included.</li>
+          <li>A breaking change needs a codemod and one version of overlap.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>The library is tokens plus primitives plus a few composed components. Docs and tests ship with it.</li>
+        <li>The public API is props and tokens. Class names and DOM structure are not a contract.</li>
+        <li>I would not let every team publish a button. A new component needs a short proposal.</li>
+        <li>Non-functional: tree-shaking, server-safe imports, visual regression, and an accessibility check in CI.</li>
+        <li>Edge cases: a token rename, a nested interactive control, reduced motion, and a consumer still on the previous major.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>Copy-paste into each app: fast to start, and the buttons drift apart within a quarter.</li>
+        <li>A versioned package with tokens as the contract: slower to change, and every product can upgrade on purpose.</li>
+      </ul>
+      <div class="pick"><p>I would pick the versioned package. Are you comfortable with that before I talk about the API of a component?</p></div>
+
+      <h3 id="library-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two. Here the API is the component contract, not only HTTP.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Do consumers install one package, or can they depend on a single component?</li>
+        <li>Do we need a runtime theme switch, or is theming build-time?</li>
+        <li>Is there an HTTP API at all, or only the package?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Tokens are data: color, space, type, radius, and motion. Components read variables, not hard-coded values.</li>
+        <li>Each component has a typed props list, a version, and a deprecation note if a prop is leaving.</li>
+        <li>I would ship one entry point so deep imports do not become a private API.</li>
+        <li>Semantic versioning: fix is safe, feature is additive, major has a codemod.</li>
+        <li>The docs site is a small REST or static catalog of examples. It is not on the product's critical path.</li>
+        <li>Telemetry, if we collect it, is adoption counts per component version, not user content.</li>
+        <li>I would rather have no runtime CSS-in-JS on the critical path. Static CSS keeps server render cheap.</li>
+      </ul>
+
+      <h3 id="library-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>One design-system team, or each product squad contributing?</li>
+        <li>Are we wrapping this around an existing visual language, or starting clean?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>Tokens</b><i>→</i><b>Primitives</b><i>→</i><b>Components</b><i>→</i><b>Product app</b><i>→</i><b>Docs and visual tests</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: products depend on the package. They do not copy the source.</li>
+        <li>Primitives are button, text field, dialog. Composed pieces such as a picker sit on top and can lag a version.</li>
+        <li>State stays inside the component unless the caller needs it. I would not force a global store.</li>
+        <li>Theme is a set of CSS variables on a parent. Switching color mode does not reload the app.</li>
+        <li>I would code-split the docs, not the button. The button must be in the main bundle only if the page uses it.</li>
+        <li>The bottleneck at scale is upgrade pain, not QPS. Codemods and visual diffs are the scale plan.</li>
+        <li>CI runs accessibility checks and screenshot diffs per component. A contrast regression fails the build.</li>
+      </ul>
+
+      <h3 id="library-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>A hundred teams: I keep one major in support and publish a migration guide, not a long-lived fork.</li>
+        <li>If the package registry is down, apps keep the version they already installed. Runtime does not phone home.</li>
+        <li>A bad release is yanked and the previous version stays installable. Feature flags do not belong inside a button.</li>
+        <li>A heavy component is split so a page that only needs a button does not download a chart.</li>
+      </ul>
+
+      <h3 id="library-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>The library is a contract between teams, so the API and the upgrade path matter more than any single component.</li>
+        <li>Tokens, a versioned package, and CI that catches accessibility and visual drift.</li>
+        <li>We move slower on purpose, and we stop shipping five different buttons.</li>
+        <li>I would measure adoption by version and time-to-upgrade, and treat a stuck major as a defect.</li>
+      </ul>
+    </article>
+
+    <article id="panel-editor" role="tabpanel" aria-labelledby="tab-editor" hidden>
+      <h2>Collaborative editor</h2>
+      <p class="prompt">Interviewer: design an online editor, like a shared document, with more than one person typing.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#editor-req">Requirements</a>
+        <a href="#editor-api">API</a>
+        <a href="#editor-comp">Components</a>
+        <a href="#editor-scale">Scale</a>
+        <a href="#editor-wrap">Wrap-up</a>
+      </nav>
+      <h3 id="editor-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes. Conflict handling usually becomes the heart of this round.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>How many people edit the same doc at once, and is it text only or rich content?</li>
+        <li>Do we need comments, suggestions, and live cursors?</li>
+        <li>Must it work offline, or only while the socket is up?</li>
+        <li>How large is a document, and is there a permission difference between view and edit?</li>
+        <li>What latency do we want from keystroke to other people's screens?</li>
+        <li>Are there regions, data residency, or audit requirements?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>Rich text, tens of concurrent editors, thousands of daily active users on popular docs.</li>
+          <li>Live cursors, comments anchored to text, and offline edits that sync later.</li>
+          <li>View and edit are different permissions, checked on every change.</li>
+          <li>Other people see a keystroke within about two hundred milliseconds on a healthy network.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>A document is a list of blocks. Text inside a block is the part we merge. Images and tables are blocks with their own ids.</li>
+        <li>Cursors and presence are ephemeral. They are not part of the saved document.</li>
+        <li>Comments anchor to a stable id inside the text, not to a character offset that drifts.</li>
+        <li>Non-functional: merge without data loss, permission checks on the server, and a snapshot so we do not replay the full history on open.</li>
+        <li>Edge cases: two people delete the same word, a comment on text that was cut, offline edits that overlap, and a viewer who must not receive the ops.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>Operational transformation: the server orders every op. Clients transform against that order. It is proven, and offline is awkward because the client needs the server's place in line.</li>
+        <li>A CRDT per block: each client can edit offline and merge later without a central order. Payloads are a bit larger, and the model is easier to reason about when the network drops.</li>
+      </ul>
+      <div class="pick"><p>I would pick a CRDT for the text, plus a server snapshot every so often. Last-write-wins is only for fields like the title. Does that split sound right?</p></div>
+
+      <h3 id="editor-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is the hot path the live op stream, with snapshots as the cold path?</li>
+        <li>Should presence share the document socket or stay separate?</li>
+        <li>How long may a client be offline before we ask them to reload?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Document: id, ACL, snapshot version, and title. Title uses a version number, not the CRDT.</li>
+        <li>Op: document id, client id, a CRDT id, and the payload. The server stores it and fans it out. It does not rewrite it.</li>
+        <li>Open is REST: snapshot plus the ops since that snapshot. Live edits are a WebSocket.</li>
+        <li>I would not put cursors on that same durable log. Presence is a side channel with a short TTL.</li>
+        <li>If the socket drops, the client resumes from the last op id. If it is too far behind, it fetches a new snapshot.</li>
+        <li>A save from offline is a batch of ops with client ids, so a retry is idempotent.</li>
+        <li>The server rejects an op when the user lost edit permission, even if they loaded the doc earlier.</li>
+        <li>Images upload to object storage. The document stores the id, not the bytes.</li>
+      </ul>
+
+      <h3 id="editor-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>One editor codebase, or several products embedding it?</li>
+        <li>Do comments and the doc canvas ship as one bundle?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>Editor shell</b><i>→</i><b>Block list</b><i>→</i><b>CRDT model</b><i>→</i><b>Op log</b><i>→</i><b>Snapshot store</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: the screen shows a window of blocks. The model can be larger than the DOM.</li>
+        <li>Local typing updates the model first, then the socket. I do not wait for a round trip to paint my own character.</li>
+        <li>Undo is a local stack of inverse ops, not a global undo that would surprise the other author.</li>
+        <li>Offline ops sit in IndexedDB and flush on reconnect. The UI shows they are pending.</li>
+        <li>I virtualize blocks so a long page does not create thousands of nodes.</li>
+        <li>The bottleneck is applying a burst of remote ops on the main thread. I batch paints to a frame.</li>
+        <li>I would watch op apply time, socket lag, and failed permission checks, with an SLO on keystroke latency.</li>
+      </ul>
+
+      <h3 id="editor-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>A very large doc: snapshot plus a window of blocks. I do not replay ten years of ops on open.</li>
+        <li>If the socket service is down, I keep local edits queued and say we will sync. I do not pretend others can see them.</li>
+        <li>If two offline clients conflict, the CRDT merges the text. I surface a comment only if its anchor survived.</li>
+        <li>A hot document with hundreds of viewers: presence is sampled, and read-only viewers do not join the op fan-out at full rate. They can poll a snapshot.</li>
+        <li>I would kill a bad client build with a flag if it starts sending ops the server must reject.</li>
+      </ul>
+
+      <h3 id="editor-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>The hard part is concurrent text, not the toolbar.</li>
+        <li>CRDT inside blocks, snapshots for open, a separate channel for cursors, permissions on every op.</li>
+        <li>We accept larger ops than classic OT, and we get offline merge without a central transform.</li>
+        <li>I would ship it behind a flag on one product surface and watch keystroke latency and merge errors.</li>
+      </ul>
+    </article>
+
+    <article id="panel-messenger" role="tabpanel" aria-labelledby="tab-messenger" hidden>
+      <h2>Messenger</h2>
+      <p class="prompt">Interviewer: design a messenger, in the shape of Slack. Channels, direct messages, and history.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#messenger-req">Requirements</a>
+        <a href="#messenger-api">API</a>
+        <a href="#messenger-comp">Components</a>
+        <a href="#messenger-scale">Scale</a>
+        <a href="#messenger-wrap">Wrap-up</a>
+      </nav>
+      <h3 id="messenger-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>Is this workspace chat: channels, direct messages, and threads?</li>
+        <li>What scale: people per workspace, messages per channel, concurrent connections?</li>
+        <li>Do we need presence, typing, reactions, and file attachments?</li>
+        <li>Is history searchable in this design, or is search a later system?</li>
+        <li>Offline sends, or only live while connected?</li>
+        <li>Any end-to-end encryption, retention, or audit requirement?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>Work chat. The server can read messages so we can search and meet compliance later.</li>
+          <li>Channels and threads. Presence and typing are best-effort.</li>
+          <li>History is paged. Search is a separate index, not the hot path.</li>
+          <li>A client may queue a send for a few minutes offline. It is not a full offline product.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>A channel is an ordered log. A thread is a log with a parent message id.</li>
+        <li>The client generates the message id so a retry cannot post twice.</li>
+        <li>Unread state and the log are server-owned. The UI may paint ahead, then reconcile.</li>
+        <li>Non-functional: order per channel, reconnect without a gap or a duplicate, and a virtualized list so a long channel stays cheap.</li>
+        <li>Edge cases: send during a reconnect, two devices on one user, a message deleted while visible, and a channel the user just lost access to.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>Poll the latest page: simple, and it feels late and wasteful at chat scale.</li>
+        <li>REST for history, a WebSocket for new events, resume from the last sequence. If the gap is large, throw the buffer away and refetch.</li>
+      </ul>
+      <div class="pick"><p>I would pick REST plus a socket with a sequence number. Is search in scope, or may I leave it as a follower system?</p></div>
+
+      <h3 id="messenger-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Read-heavy history, write-light sends. Does that match how you see it?</li>
+        <li>Should typing and presence be durable at all?</li>
+        <li>How should we paginate: newest window first?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Message: client UUID, channel id, optional thread id, body, server sequence, and time.</li>
+        <li>Membership and unread cursors are their own resources. I do not hide them inside the message.</li>
+        <li>GET history with a cursor. POST message with the client id as the idempotency key.</li>
+        <li>The socket emits message created, message updated, and a resume token. Typing is a separate ephemeral event, throttled.</li>
+        <li>Presence is a heartbeat with a TTL around half a minute. I would not store it next to messages.</li>
+        <li>Errors: a 409 on a duplicate client id returns the original message. A 403 means drop it from the outbox and say it was not allowed.</li>
+        <li>Attachments upload first. The message references the file id.</li>
+        <li>I would not put message bodies in a push payload. The push carries an id, and the client fetches.</li>
+      </ul>
+
+      <h3 id="messenger-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>One web app, or also a desktop shell around the same client?</li>
+        <li>Is the message list virtualized from day one?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>Channel list</b><i>→</i><b>Message window</b><i>→</i><b>Outbox</b><i>→</i><b>REST history</b><i>→</i><b>WebSocket</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: the screen holds one channel window, not the whole history.</li>
+        <li>Sending paints the bubble immediately with a pending mark, then replaces it when the server sequence arrives.</li>
+        <li>The outbox lives in memory and in IndexedDB so a refresh does not lose a pending send.</li>
+        <li>I virtualize rows. Images and link previews lazy-load.</li>
+        <li>If the socket falls behind, I resync from REST instead of applying a huge burst on the main thread.</li>
+        <li>Cache: the latest page of the open channel in memory, older pages discarded as you scroll away.</li>
+        <li>I would watch send latency, reconnect gaps, and duplicate rate, with an SLO on time-to-first-message for the open channel.</li>
+      </ul>
+
+      <h3 id="messenger-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>A channel with a huge membership: fan-out is by subscription to that channel, not to every user in the company.</li>
+        <li>If the socket tier is down, history still loads and sends queue. I say live updates are paused.</li>
+        <li>If history is down, I show the messages I already have and disable scroll-back rather than a blank screen.</li>
+        <li>A hot channel: coalesce typing events and cap presence updates so they cannot drown real messages.</li>
+        <li>I retry sends with jitter and the same client id. I do not mint a new id on retry.</li>
+      </ul>
+
+      <h3 id="messenger-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>Chat is an ordered log plus a live tail, with identity on the client so retries are safe.</li>
+        <li>REST for the past, a sequenced socket for the present, ephemeral events kept off the log.</li>
+        <li>We do not promise full offline, and we do not pretend search is the same pipeline.</li>
+        <li>I would roll the socket resume out by workspace and watch duplicate sends and gap repairs.</li>
+      </ul>
+    </article>
+
+    <article id="panel-cookie" role="tabpanel" aria-labelledby="tab-cookie" hidden>
+      <h2>Cookie banner</h2>
+      <p class="prompt">Interviewer: design an accept-or-reject cookie banner. Compliance and performance both matter.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#cookie-req">Requirements</a>
+        <a href="#cookie-api">API</a>
+        <a href="#cookie-comp">Components</a>
+        <a href="#cookie-scale">Scale</a>
+        <a href="#cookie-wrap">Wrap-up</a>
+      </nav>
+      <h3 id="cookie-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes. This problem is won on scope and on not hurting the page.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>Which regions, and is consent opt-in, opt-out, or both depending on the region?</li>
+        <li>What categories: strictly necessary, functional, analytics, marketing?</li>
+        <li>Who is the user: anonymous visitor, signed-in account, or both?</li>
+        <li>Must reject be as easy as accept, and can they change their mind later?</li>
+        <li>What may we set before a choice, and what scripts must wait?</li>
+        <li>Any budget for LCP, CLS, and the size of the consent code?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>GDPR-style opt-in for analytics and marketing. Necessary cookies only before a choice.</li>
+          <li>Accept and reject are equally visible. A link reopens the choice later.</li>
+          <li>The banner is an overlay. It must not shift the page and must not be the LCP element.</li>
+          <li>A policy change bumps a version and asks again.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>Consent is a record: who or which device, which policy version, which region, which categories, and when.</li>
+        <li>The page ships a tiny gate. Non-essential tags do not run until that record says yes.</li>
+        <li>Necessary cookies cover the session, the load balancer, and storing this choice. Nothing else.</li>
+        <li>Non-functional: the gate is inline and small, the dialog is keyboard accessible, and a late policy fetch cannot block first paint.</li>
+        <li>Edge cases: a choice on one device, Global Privacy Control already set, a child region with a stricter default, and a user who rejects and then signs in.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>A third-party consent script in the head: easy to buy, and it competes with LCP and can run late.</li>
+        <li>A first-party stub in the HTML that reads a local record, renders the choice, and only then loads tags. The policy text can revalidate after paint.</li>
+      </ul>
+      <div class="pick"><p>I would pick the first-party stub. Is equal-weight reject a requirement I should treat as fixed?</p></div>
+
+      <h3 id="cookie-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is the record anonymous until sign-in, and do we merge it after?</li>
+        <li>Do we need real time here at all?</li>
+        <li>Should the policy be cached at the edge?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Policy: version, region, categories, and the legal text URL. Cached on the CDN.</li>
+        <li>Record: subject id, policy version, region, choices map, timestamp, and source such as banner or GPC.</li>
+        <li>GET policy is cacheable. POST choice is idempotent for the same subject and version.</li>
+        <li>No WebSocket. This is a rare write. Polling would be wasteful.</li>
+        <li>The stub reads a first-party cookie or local record so a refresh does not ask again.</li>
+        <li>If POST fails, I keep the choice locally and retry. I do not start marketing tags until the post succeeds or the local record is enough for our policy. I would ask which of those you prefer. My default is: do not start tags until we have a stored yes.</li>
+        <li>Signed-in merge is a POST that attaches the anonymous record to the account, once.</li>
+        <li>Errors are quiet. A failed policy fetch falls back to the policy we shipped, which is the strict one.</li>
+      </ul>
+
+      <h3 id="cookie-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>One banner component across products, from the design system?</li>
+        <li>Do analytics tags live in a tag manager we must gate?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>HTML stub</b><i>→</i><b>Local record</b><i>→</i><b>Banner</b><i>→</i><b>Choice API</b><i>→</i><b>Tag gate</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: tags sit behind the gate. The banner does not sit in the document flow.</li>
+        <li>The dialog traps focus, labels both buttons, and restores focus when it closes.</li>
+        <li>I would not animate the banner in a way that moves layout. CLS stays near zero.</li>
+        <li>Copy comes from the policy version so legal can change text without a client release, after the first paint.</li>
+        <li>A feature flag can force the strict default if a region rollout is wrong.</li>
+        <li>The bottleneck is render-blocking script, not QPS. The stub stays tiny.</li>
+        <li>I would watch banner shown rate, choice latency, and LCP with and without the banner, plus a count of tags that fired with no yes.</li>
+      </ul>
+
+      <h3 id="cookie-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>A traffic spike does not change the design. The policy is static at the edge. The choice write is small.</li>
+        <li>If the choice API is down, I keep the decision on the device and retry. Tags stay off until we know.</li>
+        <li>If the CDN policy is stale, the shipped strict default still protects us. A version bump asks again.</li>
+        <li>A bad tag that ignores the gate is a kill switch on that tag id.</li>
+        <li>I would not retry in a tight loop. A few tries with jitter are enough.</li>
+      </ul>
+
+      <h3 id="cookie-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>The banner is a gate on scripts, not a modal we hope people click.</li>
+        <li>A first-party stub, a versioned policy, equal accept and reject, tags only after a stored yes.</li>
+        <li>We give up a convenient third-party loader, and we keep LCP and consent honest.</li>
+        <li>I would ship region by region behind a flag and alert if any non-essential tag fires without a yes.</li>
+      </ul>
+    </article>
+
+    <article id="panel-board" role="tabpanel" aria-labelledby="tab-board" hidden>
+      <h2>Jira board</h2>
+      <p class="prompt">Interviewer: design a board. Columns, cards, drag and drop, more than one person on it. I treat it as a Jira board: a view over issues, not a second store of the issues.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#board-req">Requirements</a>
+        <a href="#board-api">API</a>
+        <a href="#board-comp">Components</a>
+        <a href="#board-scale">Scale</a>
+        <a href="#board-wrap">Wrap-up</a>
+      </nav>
+      <h3 id="board-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>Is a column a status, a swimlane, or something the user defines?</li>
+        <li>How many issues can sit on one board, and how many people move cards at once?</li>
+        <li>Do filters run on the client or on the server?</li>
+        <li>Is order inside a column meaningful, and can two people drag the same card?</li>
+        <li>Do we need live updates, offline edits, or both?</li>
+        <li>Any WIP limit, permission per issue, or accessibility requirement for drag and drop?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>Columns are statuses. Rank inside a column is explicit.</li>
+          <li>A board can see tens of thousands of matching issues. The client holds a window, not all of them.</li>
+          <li>Filters are server-side. Live updates are on. Offline drag is not.</li>
+          <li>Keyboard must be able to move a card. Drag is not the only path.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>The board is a query plus a window per column. The issue store remains the source of truth.</li>
+        <li>A move changes status, rank, or both. Rank is a key between neighbors so I do not renumber the column.</li>
+        <li>I paint the drop immediately, then confirm. If the server disagrees, I put the card back and refetch that window.</li>
+        <li>Non-functional: p95 move confirm under a few hundred milliseconds, no long task while dragging, and stable keyboard order.</li>
+        <li>Edge cases: two drags of one card, a filter that hides the card mid-drag, a transition the workflow forbids, and a column that fails while others load.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>Load every matching issue and group them in the browser. Fine for a small board, and it falls over on a real project.</li>
+        <li>Each column asks for a ranked window. Drag posts a rank between two ids. Live events patch a card or tell that column to refetch.</li>
+      </ul>
+      <div class="pick"><p>I would pick windows and a rank key. Should a forbidden workflow transition be rejected by the server even if the UI allowed the drop?</p></div>
+
+      <h3 id="board-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is the read path the column window, and the write path a single rank or transition call?</li>
+        <li>Do we push issue events, or is a short poll acceptable?</li>
+        <li>How fresh must a card be if someone edits it on the issue page?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Board: id, filter, and the column definitions. It does not embed every issue.</li>
+        <li>Card: issue id, summary, status, rank key, and the few fields the card paints.</li>
+        <li>GET a column with a cursor. POST a move with before-id, after-id, and an idempotency key.</li>
+        <li>I would use a WebSocket or SSE for issue-updated events that match this board's filter. Polling every second will not scale.</li>
+        <li>A 409 means the neighbors changed. The client refetches the window instead of guessing a new rank.</li>
+        <li>A 422 means the workflow rejected the status change. The card animates back.</li>
+        <li>Filter changes cancel the in-flight windows and start over. I do not append a new filter onto old cards.</li>
+        <li>Permissions are applied on the query. A card I cannot see is absent, not a locked placeholder, unless you want that leak. I would keep it absent.</li>
+      </ul>
+
+      <h3 id="board-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is this one board experience, or embedded in several products?</li>
+        <li>Do we share the card component with the issue list?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>Board shell</b><i>→</i><b>Column window</b><i>→</i><b>Card</b><i>→</i><b>Rank API</b><i>→</i><b>Issue events</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: each column is its own list with its own cursor. The shell owns the filter.</li>
+        <li>UI state, such as which card is grabbed, stays local. Server state is the issue cache, patched by id.</li>
+        <li>I virtualize rows inside a column. Off-screen cards are not in the DOM.</li>
+        <li>Optimistic state is marked so a slow confirm does not let me drag the same card again.</li>
+        <li>A flag can disable live updates and leave the board on manual refresh if the event stream misbehaves.</li>
+        <li>The bottleneck is rendering and event storms, not the drag gesture itself.</li>
+        <li>I would watch move-confirm latency, conflict rate, and long tasks during drag, plus an SLO on time-to-interactive for the first window.</li>
+      </ul>
+
+      <h3 id="board-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>A million matching issues never enter the client. Deeper scroll asks for the next window.</li>
+        <li>If the issue API is down, I show the last windows I have, disable drag, and say the board is read-only.</li>
+        <li>If one column errors, the others stay. That column gets a retry.</li>
+        <li>Two people drop the same card: the server orders the writes. The loser refetches. I do not merge ranks on the client.</li>
+        <li>A noisy event stream: I coalesce patches per issue per frame, and I back off if I am applying more events than I can paint.</li>
+      </ul>
+
+      <h3 id="board-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>A board is a windowed view, not a copy of the issue database.</li>
+        <li>Rank between neighbors, optimistic move, server as the judge, live patches by issue id.</li>
+        <li>We give up dragging through the entire backlog offline, and we keep the client small.</li>
+        <li>I would enable live updates per project and watch conflict rate and long tasks.</li>
+      </ul>
+    </article>
+
+    <article id="panel-search" role="tabpanel" aria-labelledby="tab-search" hidden>
+      <h2>Permissioned search</h2>
+      <p class="prompt">Interviewer: design search across a tenant's Jira issues and Confluence pages. Results have to be fast, ranked, and only what this person is allowed to see.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#search-req">Requirements</a>
+        <a href="#search-api">API</a>
+        <a href="#search-comp">Components</a>
+        <a href="#search-scale">Scale</a>
+        <a href="#search-wrap">Wrap-up</a>
+      </nav>
+      <h3 id="search-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes. I would name the permission rule before I talk about ranking.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>What is in the index: issues, pages, comments, attachments?</li>
+        <li>How large is a tenant, and what is the latency bar for typeahead versus a full results page?</li>
+        <li>If someone loses access, how fast must that hit disappear?</li>
+        <li>May we show "you cannot open this", or must a forbidden hit be invisible?</li>
+        <li>Do we need facets, filters, and highlighting?</li>
+        <li>Is ranking keyword, recency, or personal?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>Issues and pages, per tenant. A big tenant can have millions of issues.</li>
+          <li>Typeahead under about three hundred milliseconds. A full page under a second, at p95.</li>
+          <li>A forbidden document is invisible, including its title. Facets must not leak it either.</li>
+          <li>A deprovision or a permission change should drop the hit within seconds, not on the next full reindex.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>The client is not the place that enforces permissions. It only renders what the server already allowed.</li>
+        <li>I would rather over-fetch candidates and filter them with a fresh permission check than trust a stale pre-filtered index.</li>
+        <li>Highlighting is computed on the server so we do not ship the whole document to bold a word.</li>
+        <li>Non-functional: tenant isolation, a short TTL on permission cache, and cancel-on-type in the UI.</li>
+        <li>Edge cases: a user removed mid-session, a grant that changed an hour ago, a query that matches only forbidden docs, and a facet count that would reveal a private project.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>Index a copy of the content per user. Reads are simple, and writes explode. A permission change rewrites a huge slice of the index.</li>
+        <li>One index per tenant, retrieve candidates, then authorize and fill the page. Writes stay sane. The query does a bit more work, and I over-fetch so the page is not short after filtering.</li>
+      </ul>
+      <div class="pick"><p>I would pick tenant index plus a permission check at query time. Is "invisible, not locked" the right product rule?</p></div>
+
+      <h3 id="search-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Are suggest and full search two endpoints with different budgets?</li>
+        <li>How stale may the index be, in seconds?</li>
+        <li>Do we paginate with a cursor so ranking does not skip or repeat?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Query: text, types, filters, cursor, and a limit. Response: hits with id, type, title, snippet, rank, and the next cursor.</li>
+        <li>I would not return a score the user can use to infer hidden documents. The cursor is opaque.</li>
+        <li>Suggest is a tighter limit, no facets. Full search can include facets that were counted after authorization.</li>
+        <li>REST is enough. I debounce and abort the previous request. A socket is not worth it for typing.</li>
+        <li>The permission cache key includes a version. Deprovision bumps that version so old cache entries miss.</li>
+        <li>If authorization filters too many hits, the server fetches another candidate batch before it returns a short page.</li>
+        <li>Errors: timeout returns a retryable error. I do not show a cached result from another user.</li>
+        <li>The client cache is only for back navigation in this session, and it is keyed by user. It is not a source of truth.</li>
+      </ul>
+
+      <h3 id="search-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is the box a global header, a page, or both sharing one client?</li>
+        <li>Do we already have a design-system combobox?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>Search box</b><i>→</i><b>BFF</b><i>→</i><b>Tenant index</b><i>→</i><b>Authz</b><i>→</i><b>Hits</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: authz sits after the index and before the response. The browser never sees the candidate list.</li>
+        <li>The box waits about a hundred and fifty milliseconds after the last key, then sends. A new key aborts the last call.</li>
+        <li>The list is a combobox: keyboard, active descendant, and a status line for result count.</li>
+        <li>I keep server state for the result set and local state for the query text and highlight.</li>
+        <li>Index lag is honest. If we know the index is behind, I say results may be a few seconds old.</li>
+        <li>The bottleneck at tenant scale is the index plus authz fan-out, not rendering twenty rows.</li>
+        <li>I would watch p95 by endpoint, empty-page rate after authz, and any hit opened that returns 403. A 403 on open is a defect.</li>
+      </ul>
+
+      <h3 id="search-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>Ten million issues: the index is per tenant, sharded. The client still asks for one page.</li>
+        <li>If search is down, the box says search is unavailable. I do not fall back to a client-side scan.</li>
+        <li>If authz is slow, I would rather time out than return unchecked hits.</li>
+        <li>A hot tenant: cache popular queries briefly, but never across users, and never past a permission-version bump.</li>
+        <li>I limit in-flight requests to one suggest call. That avoids a thundering herd from a fast typist.</li>
+      </ul>
+
+      <h3 id="search-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>This is a permission problem that has to feel like search.</li>
+        <li>Tenant index, authorize at query time, invisible misses, a client that only types, aborts, and renders.</li>
+        <li>We spend more on each query, and we do not leak a title or rewrite the index on every grant change.</li>
+        <li>I would ship suggest first, alert on 403-after-click, and keep the permission TTL short.</li>
+      </ul>
+    </article>
+
+    <article id="panel-inbox" role="tabpanel" aria-labelledby="tab-inbox" hidden>
+      <h2>Notification center</h2>
+      <p class="prompt">Interviewer: design notifications. I focus on the in-app center: the bell, the list, and the unread count. Email and mobile push are workers fed by the same event.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#inbox-req">Requirements</a>
+        <a href="#inbox-api">API</a>
+        <a href="#inbox-comp">Components</a>
+        <a href="#inbox-scale">Scale</a>
+        <a href="#inbox-wrap">Wrap-up</a>
+      </nav>
+      <h3 id="inbox-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>Which events: comments, mentions, assignments, edits, or all of them?</li>
+        <li>Who receives one: the actor's watchers, the page watchers, or a team?</li>
+        <li>Do we collapse many edits of one page into a single row?</li>
+        <li>Channels in scope: in-app only, or email and push as well?</li>
+        <li>What is unread: a count, a dot, or a full list that must be exact?</li>
+        <li>Preferences, quiet hours, and how fast the bell must move?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>In-app is the product I design. Email is another consumer of the same event.</li>
+          <li>Recipients are watchers and mentions. The actor does not notify themselves.</li>
+          <li>Rapid edits of one page collapse into one row.</li>
+          <li>The badge can be a few seconds stale. The list, once opened, is exact.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>One human action becomes one event, then many recipient rows. That fan-out is the design.</li>
+        <li>I would group by a key such as page plus verb, so twenty edits do not become twenty rows.</li>
+        <li>Preferences are checked before I write the inbox row, not after the user opens the bell.</li>
+        <li>Non-functional: mark-read is idempotent, the list is paged, and the badge does not poll every second.</li>
+        <li>Edge cases: a watcher removed before delivery, a mention of someone who cannot see the page, a burst on a popular page, and mark-read on two devices.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>Fan-in at read time: store the event once and compute the inbox when the bell opens. Cheap to write, and the open becomes a heavy query.</li>
+        <li>Fan-out at write time into a per-user inbox. Writes cost more, and the bell is a cheap query. I would still skip fan-out for users who have been idle for a long time and build their first page on read.</li>
+      </ul>
+      <div class="pick"><p>I would pick fan-out for active users and fan-in for cold users. Is a slightly stale badge acceptable?</p></div>
+
+      <h3 id="inbox-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is the inbox read-heavy once we have paid the fan-out cost?</li>
+        <li>Do we push the badge, or is SSE enough?</li>
+        <li>Should mark-all-read be one call?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Notification: id, user id, group key, title, target URL, read time, and the rolled-up count.</li>
+        <li>Preference: user id, event type, channel, and quiet hours.</li>
+        <li>GET inbox with a cursor. POST read on one id. POST read-all with a timestamp so a race does not mark a newer row.</li>
+        <li>The badge is a count endpoint or a push. I would use SSE or a WebSocket, not a one-second poll.</li>
+        <li>A repeat POST read returns the same row. The client can retry safely.</li>
+        <li>If the user cannot see the target, I drop the notification rather than show a title they must not read.</li>
+        <li>Email is not this API. A worker reads the same event and sends mail if the preference says so.</li>
+        <li>Errors on the badge are soft. The last count stays, with no scary banner, until the list is opened.</li>
+      </ul>
+
+      <h3 id="inbox-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is the bell global chrome shared by every product?</li>
+        <li>Do we virtualize the list from the start?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>Event</b><i>→</i><b>Recipient resolve</b><i>→</i><b>Inbox row</b><i>→</i><b>Bell</b><i>→</i><b>List</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: grouping happens before the row is written, not in the React list.</li>
+        <li>Opening the bell fetches the first page. Mark-read paints immediately and reconciles the count.</li>
+        <li>Local state is open-or-closed and which row is focused. Server state is the page and the count.</li>
+        <li>I virtualize if the page is long. Most people only need the first screen.</li>
+        <li>A flag can disable a noisy event type without a deploy.</li>
+        <li>The bottleneck is fan-out on a hot page, so I collapse the group before I write thousands of rows.</li>
+        <li>I would watch fan-out time, badge lag, and mark-read errors, with an SLO on time-to-open the list.</li>
+      </ul>
+
+      <h3 id="inbox-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>A page with a huge watcher list: group first, then write rows in batches. I do not notify idle accounts inline.</li>
+        <li>If the inbox store is down, the bell keeps the last count and the panel says notifications are unavailable.</li>
+        <li>If the event bus is delayed, the product still works. Notifications are not on the click path of editing a page.</li>
+        <li>Two devices mark read: the timestamp on read-all keeps them from fighting.</li>
+        <li>I retry badge connect with jitter. I do not reconnect in a tight loop after an outage.</li>
+      </ul>
+
+      <h3 id="inbox-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>The center is a cheap read because we paid for fan-out, and we grouped before we wrote.</li>
+        <li>Active users get rows. Cold users are built on open. The badge is allowed to lag. The list is not.</li>
+        <li>We spend write capacity, and we keep the bell off the user's critical path.</li>
+        <li>I would roll out by event type and watch fan-out time and badge lag.</li>
+      </ul>
+    </article>
+
+    <article id="panel-feed" role="tabpanel" aria-labelledby="tab-feed" hidden>
+      <h2>Confluence feed</h2>
+      <p class="prompt">Interviewer: design a feed of Confluence activity. Rank it from likes, shares, views, and who I follow. Do not drown me in every edit.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#feed-req">Requirements</a>
+        <a href="#feed-api">API</a>
+        <a href="#feed-comp">Components</a>
+        <a href="#feed-scale">Scale</a>
+        <a href="#feed-wrap">Wrap-up</a>
+      </nav>
+      <h3 id="feed-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>Is this following people and spaces, or every update in the tenant?</li>
+        <li>Does following send mail, or is mail a separate watch?</li>
+        <li>What is a card: one action, or one page with the actions rolled up?</li>
+        <li>How do we rank: recency, popularity, or what I am likely to open?</li>
+        <li>What scale: cards per user per day, and how fresh is fresh?</li>
+        <li>Must every card be something I am allowed to open?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>Following does not send mail. Watching mail stays a different feature.</li>
+          <li>One card per page. Many edits in a short window collapse.</li>
+          <li>Rank is recency with a boost if I follow the author or I viewed the page before.</li>
+          <li>A page I cannot read never appears. Revoking access removes it on the next fetch.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>The feed is a ranked list of pages I am likely to care about, not an audit log.</li>
+        <li>I would roll activity up so a busy editor does not push the rest of the feed down.</li>
+        <li>Permissions are checked when I read the feed, so a revoke is not stuck until a rebuild.</li>
+        <li>Non-functional: stable cursor pagination, a first page that can come from cache, and no layout jump as counts update.</li>
+        <li>Edge cases: I unfollow mid-scroll, a page is restricted after I saw the card, a brand-new user with no follows, and a burst of edits on one page.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>Pure fan-out on write: every follower gets the card pushed into a precomputed feed. Fast to read, and a popular author is an expensive write.</li>
+        <li>Pure fan-in on read: store the events and build the page when I open the feed. Cheap to write, and the open gets slow.</li>
+      </ul>
+      <div class="pick"><p>I would push to recently active followers and build the page on read for everyone else. Does a minute of lag on the feed bother you?</p></div>
+
+      <h3 id="feed-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is the hot path GET the next page of cards?</li>
+        <li>Do likes and views need to be live on the open card?</li>
+        <li>What is the cursor: score plus id, so a new insert does not skip rows?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Card: page id, title, space, actors, a rolled-up verb, a count, a score, and a cursor.</li>
+        <li>Follow: user id and the target, which is a person or a space.</li>
+        <li>GET feed with a cursor. POST follow and DELETE follow. Those are rare writes.</li>
+        <li>I would not socket the whole feed. A refetch when I focus the tab is enough. Live counts can wait for the next page.</li>
+        <li>The cursor is opaque and ordered by score then id, so paging does not duplicate or skip.</li>
+        <li>If a card fails the permission check, I drop it and fill the page from the next candidates.</li>
+        <li>Empty feed for a new user returns a small set of suggested spaces, clearly marked as suggestions, not as activity.</li>
+        <li>Errors: a failed next page keeps the cards I have and offers retry. I do not blank the feed.</li>
+      </ul>
+
+      <h3 id="feed-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is the feed a home page, or a panel beside the page?</li>
+        <li>Do we virtualize the list?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>Activity event</b><i>→</i><b>Roll up</b><i>→</i><b>Active followers</b><i>→</i><b>Feed page</b><i>→</i><b>Authz</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: roll-up happens before the card is stored. The list just renders cards.</li>
+        <li>The first page can paint from a short-lived cache, then revalidate. I label nothing as live if it is not.</li>
+        <li>I virtualize the list. Images on cards lazy-load.</li>
+        <li>Follow and unfollow update local state immediately and reconcile. The next page uses the new follows.</li>
+        <li>A flag can switch a tenant from hybrid fan-out to pure fan-in if a hot author is too expensive.</li>
+        <li>The bottleneck is a popular author with many followers, so only active followers get a push.</li>
+        <li>I would watch time-to-first-card, permission-drop rate, and follow-write cost, with an SLO on first-page latency.</li>
+      </ul>
+
+      <h3 id="feed-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>Ten times the events: roll-up harder, and cap how many followers receive a push. The rest see it on read.</li>
+        <li>If the feed service is down, I show the last first page from the client cache and pause new follows.</li>
+        <li>If authz is down, I would rather show a shorter page than show a restricted title.</li>
+        <li>A card whose page was deleted drops out on the next fetch. I do not leave a broken link as a permanent row.</li>
+        <li>I do not refetch the entire feed on one new event. I prepend or I wait for the next focus.</li>
+      </ul>
+
+      <h3 id="feed-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>The feed is ranked, rolled-up pages, not a firehose, and following is not mail.</li>
+        <li>Push to active followers, build on read for everyone else, permission check at read.</li>
+        <li>We accept a little lag, and we avoid both a slow open and a write storm.</li>
+        <li>I would ship to a slice of tenants and watch first-page latency and restricted titles that slipped through.</li>
+      </ul>
+    </article>
+
+    <article id="panel-mention" role="tabpanel" aria-labelledby="tab-mention" hidden>
+      <h2>Mentions</h2>
+      <p class="prompt">Interviewer: design @mentions. Typing a name in a Jira or Confluence editor should find the right person or team, fast, and only people who belong in this context.</p>
+      <nav class="phases" aria-label="Steps">
+        <a href="#mention-req">Requirements</a>
+        <a href="#mention-api">API</a>
+        <a href="#mention-comp">Components</a>
+        <a href="#mention-scale">Scale</a>
+        <a href="#mention-wrap">Wrap-up</a>
+      </nav>
+      <h3 id="mention-req">Requirement gathering</h3>
+      <p class="when">About the first twelve minutes.</p>
+      <h4 class="ask">Questions, one at a time</h4>
+      <ol class="ask-list">
+        <li>Are we mentioning users, teams, or both?</li>
+        <li>Is the directory the whole tenant, or people already on this page or project?</li>
+        <li>How large is the directory, and what latency do we want after a keystroke?</li>
+        <li>Must every suggestion be someone who can see this page?</li>
+        <li>Keyboard only, or mouse as well, and what does the screen reader hear?</li>
+        <li>If suggest is down, can the editor still save plain text?</li>
+      </ol>
+      <div class="assume">
+        <p class="kicker">If they tell me to decide</p>
+        <ul>
+          <li>Users and teams. Bias toward people already on this issue or page, then the directory.</li>
+          <li>A large tenant, tens or hundreds of thousands of accounts. Suggest stays under about three hundred milliseconds at p95.</li>
+          <li>I only suggest people who can see this content.</li>
+          <li>If suggest fails, the editor still works. I insert text and I do not block save.</li>
+        </ul>
+      </div>
+      <h4 class="say">What I would say</h4>
+      <ul class="say-list">
+        <li>A mention is a structured token: type, id, and a display label. It is not a string we hope still matches after a rename.</li>
+        <li>I debounce, I abort the previous query, and I cap the list at about eight.</li>
+        <li>The first paint can be recent mentions from this session. The server list replaces it when it returns.</li>
+        <li>Non-functional: a combobox pattern, no request per key without a pause, and no download of the whole directory.</li>
+        <li>Edge cases: two people with the same name, a deactivated account, a team the user cannot see, and a query that arrives after a newer one.</li>
+      </ul>
+      <h4 class="say">Two approaches</h4>
+      <ul class="say-list">
+        <li>Download the directory and filter locally. Instant after the download, and impossible at tenant scale, plus it leaks accounts.</li>
+        <li>A prefix query to the server, scoped by permission and biased by context. A small session cache for repeats.</li>
+      </ul>
+      <div class="pick"><p>I would pick the server prefix query. Should a deactivated account be hidden, or shown as inactive?</p></div>
+
+      <h3 id="mention-api">API design and schema</h3>
+      <p class="when">About minute twelve to twenty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is this read-only and very chatty, with a tight limit?</li>
+        <li>Do we need real time, or is a fresh query per pause enough?</li>
+        <li>How do we store the mention inside the document or the comment?</li>
+      </ol>
+      <h4 class="say">Contract</h4>
+      <ul class="say-list">
+        <li>Suggest request: query, context id such as page or issue, types, and a limit.</li>
+        <li>Hit: type, id, label, secondary text such as a team name, and whether they are already on this content.</li>
+        <li>REST, aborted when the query changes. No socket.</li>
+        <li>The saved body stores the id. The label is display-only and can be refreshed when we render.</li>
+        <li>I start the request after a short pause, around a hundred and fifty milliseconds, and I skip an empty query.</li>
+        <li>Cache key is user plus context plus query, in memory, for this session only.</li>
+        <li>A stale response is ignored if its query is not the current one.</li>
+        <li>Errors return an empty list with a flag so the UI can say suggestions are unavailable without blocking the keystroke.</li>
+      </ul>
+
+      <h3 id="mention-comp">Component design and scalability</h3>
+      <p class="when">About minute twenty-two to forty-two.</p>
+      <h4 class="ask">Questions</h4>
+      <ol class="ask-list">
+        <li>Is this one picker used by the editor, comments, and Jira fields?</li>
+        <li>Does the design system already have a listbox?</li>
+      </ol>
+      <div class="flow" aria-label="Boxes to draw">
+        <b>Editor</b><i>→</i><b>Mention picker</b><i>→</i><b>Suggest API</b><i>→</i><b>Directory prefix</b><i>→</i><b>Authz</b>
+      </div>
+      <ul class="say-list">
+        <li>While I draw: authz is on the suggest call. The picker never filters a full directory.</li>
+        <li>The picker is a combobox. Arrow keys move, enter inserts, escape closes, and focus returns to the editor.</li>
+        <li>I announce the count politely. I do not move screen-reader focus on every keystroke.</li>
+        <li>Recent picks are local state. Results are server state for the current query.</li>
+        <li>Insert replaces the @query with a token node so backspace deletes the whole mention.</li>
+        <li>The bottleneck is query rate on a large directory, so the prefix index stays on the server and the client sends one call at a time.</li>
+        <li>I would watch suggest latency, abort rate, and insert-to-save errors, with an SLO on time-to-results.</li>
+      </ul>
+
+      <h3 id="mention-scale">Scale-up and failures</h3>
+      <p class="when">About minute forty-two to fifty-two.</p>
+      <ul class="say-list">
+        <li>A hundred thousand accounts: prefix search, limit eight, context bias. I never page the whole company into the popover.</li>
+        <li>If suggest is down, I keep typing as plain text and I say mentions are unavailable.</li>
+        <li>If authz is slow, I would rather show a spinner than show a person who cannot see the page.</li>
+        <li>A rename: the stored id still resolves to the new label at render time.</li>
+        <li>I debounce so a fast typist does not stampede the directory.</li>
+      </ul>
+
+      <h3 id="mention-wrap">Wrap-up</h3>
+      <p class="when">Under two minutes.</p>
+      <ul class="say-list">
+        <li>A mention is an id plus a picker, not a string search over a downloaded directory.</li>
+        <li>Debounced prefix query, permission-scoped, context first, editor stays usable if suggest fails.</li>
+        <li>We accept a short pause after a key, and we do not leak accounts or freeze the editor.</li>
+        <li>I would ship the picker in comments first and watch suggest latency and empty-result rate.</li>
+      </ul>
+    </article>
+  </main>
+  <footer>
+    <p>The first five are the problems from this round: a widget platform, a component library, a collaborative editor, a messenger, and an accept-or-reject cookie banner.</p>
+    <p>The other five are the ones I would add for an Atlassian frontend system-design hour. A Jira-style board is the usual board question aimed at their product. Permission-scoped search is a current Atlassian-specific prompt: ranked results over a tenant's issues and pages, and every hit must be one the viewer can open. A notification center matches how their products fan out watches and mentions. A Confluence activity feed was asked as a top-feed problem ranked by likes, shares, and views. Mentions are the picker that shows up in their editor and issue fields, and they reuse the same permission rule as search.</p>
+    <p>Sources I used for those five: <a href="https://www.atlassian.com/company/careers/resources/interviewing/engineering">Atlassian's engineering interview guide</a> (sixty minutes, clarifying questions, tradeoffs, performance, reliability), <a href="https://interviewlegend.com/guides/companies/atlassian/system-design/design-search-and-permissions">permission-scoped search</a> (updated 21 Oct 2026), <a href="https://interviewlegend.com/guides/companies/atlassian/system-design/design-notification-system">notification fan-out</a>, <a href="https://interviewexperiences.in/experience/atlassian/atlassian-interview-p40">a June 2025 report of a top Confluence feed question</a>, and frontend interview guides that use a Jira or Trello board and a mention picker as the Atlassian-shaped versions of those problems.</p>
+  </footer>
+  <p id="tip-bar" hidden></p>
+  <script>
+    const tips = {
+      API: "Application programming interface",
+      APIs: "Application programming interfaces",
+      ACL: "Access control list",
+      ANN: "Approximate nearest neighbor",
+      BFF: "Backend for frontend",
+      BM25: "Best Matching 25",
+      CCPA: "California Consumer Privacy Act",
+      CDN: "Content delivery network",
+      CLS: "Cumulative Layout Shift",
+      CMP: "Consent management platform",
+      CORS: "Cross-origin resource sharing",
+      CRDT: "Conflict-free replicated data type",
+      CRDTs: "Conflict-free replicated data types",
+      CSP: "Content Security Policy",
+      CSR: "Client-side rendering",
+      CSS: "Cascading Style Sheets",
+      CTR: "Click-through rate",
+      DAU: "Daily active users",
+      DOM: "Document Object Model",
+      GDPR: "General Data Protection Regulation",
+      GPC: "Global Privacy Control",
+      HLD: "High-level design",
+      HTTP: "Hypertext Transfer Protocol",
+      INP: "Interaction to Next Paint",
+      JSON: "JavaScript Object Notation",
+      JQL: "Jira Query Language",
+      JWT: "JSON Web Token",
+      LCP: "Largest Contentful Paint",
+      LLD: "Low-level design",
+      MAU: "Monthly active users",
+      NFR: "Non-functional requirement",
+      NFRs: "Non-functional requirements",
+      OT: "Operational transformation",
+      QPS: "Queries per second",
+      REST: "Representational State Transfer",
+      RBAC: "Role-based access control",
+      RUM: "Real user monitoring",
+      SDK: "Software development kit",
+      SLA: "Service level agreement",
+      SLO: "Service level objective",
+      SLOs: "Service level objectives",
+      SSE: "Server-sent events",
+      SSR: "Server-side rendering",
+      TTFB: "Time to first byte",
+      TTL: "Time to live",
+      UI: "User interface",
+      URL: "Uniform Resource Locator",
+      URLs: "Uniform Resource Locators",
+      UUID: "Universally unique identifier",
+      WCAG: "Web Content Accessibility Guidelines",
+      WIP: "Work in progress",
+      XSS: "Cross-site scripting",
+      a11y: "accessibility",
+      i18n: "internationalization",
+      p95: "95th percentile",
+      p99: "99th percentile",
+      semver: "Semantic versioning"
+    }
+    const re = new RegExp(
+      "\\b(" + Object.keys(tips).sort((a, b) => b.length - a.length).join("|") + ")\\b",
+      "g",
+    )
+    function tipText(root) {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+      const nodes = []
+      while (walker.nextNode()) nodes.push(walker.currentNode)
+      for (const node of nodes) {
+        const text = node.textContent || ""
+        re.lastIndex = 0
+        if (!re.test(text)) continue
+        re.lastIndex = 0
+        const frag = document.createDocumentFragment()
+        let last = 0
+        let match
+        while ((match = re.exec(text))) {
+          frag.append(text.slice(last, match.index))
+          const abbr = document.createElement("abbr")
+          abbr.textContent = match[1]
+          abbr.title = tips[match[1]]
+          abbr.dataset.tip = tips[match[1]]
+          frag.append(abbr)
+          last = match.index + match[1].length
+        }
+        frag.append(text.slice(last))
+        node.parentNode.replaceChild(frag, node)
+      }
+    }
+    tipText(document.querySelector("main"))
+    tipText(document.querySelector("header"))
+
+    const tipBar = document.getElementById("tip-bar")
+    function showTip(abbr) {
+      tipBar.hidden = false
+      tipBar.textContent = abbr.textContent + " — " + abbr.dataset.tip
+    }
+    document.addEventListener("pointerover", (event) => {
+      const abbr = event.target.closest?.("abbr[data-tip]")
+      if (abbr) showTip(abbr)
+    })
+    document.addEventListener("click", (event) => {
+      const abbr = event.target.closest?.("abbr[data-tip]")
+      if (abbr) {
+        showTip(abbr)
+        return
+      }
+      tipBar.hidden = true
+    })
+
+    const tabsBar = document.querySelector(".tabs")
+    const syncTabsHeight = () => {
+      document.documentElement.style.setProperty(
+        "--tabs-h",
+        tabsBar.offsetHeight + "px",
+      )
+    }
+    syncTabsHeight()
+    new ResizeObserver(syncTabsHeight).observe(tabsBar)
+
+    const tabs = [...document.querySelectorAll('[role="tab"]')]
+    const panels = Object.fromEntries(
+      tabs.map((tab) => [tab.id, document.getElementById(tab.getAttribute("aria-controls"))]),
+    )
+    function select(tab, { focus = false } = {}) {
+      for (const item of tabs) {
+        const on = item === tab
+        item.setAttribute("aria-selected", on ? "true" : "false")
+        item.tabIndex = on ? 0 : -1
+        panels[item.id].hidden = !on
+      }
+      if (focus) tab.focus()
+      tab.scrollIntoView({ inline: "nearest", block: "nearest" })
+      history.replaceState(null, "", "#" + tab.id.replace("tab-", ""))
+      try { sessionStorage.setItem("sd-prep-tab", tab.id) } catch (err) {}
+      window.scrollTo({ top: 0 })
+    }
+    for (const tab of tabs) {
+      tab.addEventListener("click", () => select(tab))
+      tab.addEventListener("keydown", (event) => {
+        const index = tabs.indexOf(tab)
+        if (event.key === "ArrowRight") {
+          event.preventDefault()
+          select(tabs[(index + 1) % tabs.length], { focus: true })
+        } else if (event.key === "ArrowLeft") {
+          event.preventDefault()
+          select(tabs[(index - 1 + tabs.length) % tabs.length], { focus: true })
+        }
+      })
+    }
+    const fromHash = location.hash.replace("#", "")
+    const stored = (() => {
+      try { return sessionStorage.getItem("sd-prep-tab") } catch (err) { return null }
+    })()
+    const initial =
+      tabs.find((tab) => tab.id === "tab-" + fromHash) ||
+      tabs.find((tab) => tab.id === stored) ||
+      tabs[0]
+    select(initial)
+  </script>
+</body>
+</html>
