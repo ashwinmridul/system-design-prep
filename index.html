@@ -185,20 +185,28 @@
     .assume p, .pick p { margin: 0 0 6px; }
     .flow {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
+      flex-direction: column;
+      gap: 10px;
       margin: 8px 0 12px;
     }
-    .flow b {
-      font-weight: 600;
+    .flow-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: stretch;
+    }
+    .flow .box {
       background: white;
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 6px 8px;
-      font-size: 14px;
+      min-width: 7rem;
+      max-width: 14rem;
     }
-    .flow i { color: var(--muted); font-style: normal; }
+    .flow .box b { display: block; font-size: 14px; }
+    .flow .box span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .flow i { color: var(--muted); font-style: normal; align-self: center; }
+    .flow-row.alt .box { background: #f7f4ee; }
     footer {
       color: var(--muted);
       font-size: 14px;
@@ -371,7 +379,17 @@
         <li data-mode="single" data-opts="w-tok-yes:We already have tokens*|w-tok-no:No design system yet">Should the widget consume design-system tokens?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>Host page</b><i>→</i><b>Widget slots</b><i>→</i><b>Bridge</b><i>→</i><b>Sandboxed iframe</b><i>→</i><b>BFF</b><i>→</i><b>Product APIs</b>
+        <div class="flow-row">
+          <div class="box"><b>Host page</b><span>owns slots, theme, and navigation</span></div><i>→</i>
+          <div class="box"><b>Widget slots</b><span>lazy-mount, cap how many stay live</span></div><i>→</i>
+          <div class="box"><b>Bridge</b><span>typed messages, check origin</span></div><i>→</i>
+          <div class="box"><b>Sandboxed iframe</b><span>no cookie, no host DOM</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>BFF</b><span>short-lived scoped token</span></div><i>→</i>
+          <div class="box"><b>Product APIs</b><span>reads, and writes with an idempotency key</span></div><i>→</i>
+          <div class="box"><b>If one frame hangs</b><span>error boundary on that slot only</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: the page never shares its DOM with the widget. The bridge is the only door.</li>
@@ -502,7 +520,17 @@
         <li data-mode="single" data-opts="l-start-wrap:Wrap an existing visual language*|l-start-clean:Start clean">Wrap an existing look, or start clean?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>Tokens</b><i>→</i><b>Primitives</b><i>→</i><b>Components</b><i>→</i><b>Product app</b><i>→</i><b>Docs and visual tests</b>
+        <div class="flow-row">
+          <div class="box"><b>Tokens</b><span>color, space, type</span></div><i>→</i>
+          <div class="box"><b>Primitives</b><span>button, field, dialog</span></div><i>→</i>
+          <div class="box"><b>Components</b><span>composed pieces can lag a version</span></div><i>→</i>
+          <div class="box"><b>Product app</b><span>depends on the package</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>Docs and visual tests</b><span>not on the product path</span></div><i>→</i>
+          <div class="box"><b>CI</b><span>accessibility and screenshot diffs fail the build</span></div><i>→</i>
+          <div class="box"><b>Bad release</b><span>yank it; the previous version stays installable</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: products depend on the package. They do not copy the source.</li>
@@ -630,7 +658,17 @@
         <li data-mode="single" data-opts="e-bundle-one:Comments and the canvas in one bundle*|e-bundle-split:Comments in a separate bundle">Do comments ship with the canvas?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>Editor shell</b><i>→</i><b>Block list</b><i>→</i><b>CRDT model</b><i>→</i><b>Op log</b><i>→</i><b>Snapshot store</b>
+        <div class="flow-row">
+          <div class="box"><b>Editor shell</b><span>window of blocks, not the whole DOM</span></div><i>→</i>
+          <div class="box"><b>CRDT model</b><span>local typing paints first</span></div><i>→</i>
+          <div class="box"><b>Op log</b><span>server stores and fans out</span></div><i>→</i>
+          <div class="box"><b>Snapshot store</b><span>open does not replay all history</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>Presence</b><span>side channel, not the durable log</span></div><i>→</i>
+          <div class="box"><b>Offline queue</b><span>flush on reconnect, show pending</span></div><i>→</i>
+          <div class="box"><b>Lost edit permission</b><span>server rejects the op</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: the screen shows a window of blocks. The model can be larger than the DOM.</li>
@@ -763,7 +801,17 @@
         <li data-mode="single" data-opts="m-virt-yes:Virtualize from day one*|m-virt-no:Short channels, virtualize later">Virtualize the message list?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>Channel list</b><i>→</i><b>Message window</b><i>→</i><b>Outbox</b><i>→</i><b>REST history</b><i>→</i><b>WebSocket</b>
+        <div class="flow-row">
+          <div class="box"><b>Channel list</b><span>membership, not the messages</span></div><i>→</i>
+          <div class="box"><b>Message window</b><span>one page, virtualized</span></div><i>→</i>
+          <div class="box"><b>Outbox</b><span>client id, so a retry is the same send</span></div><i>→</i>
+          <div class="box"><b>WebSocket</b><span>new events plus a resume token</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>REST history</b><span>newest window first</span></div><i>→</i>
+          <div class="box"><b>Typing and presence</b><span>ephemeral, off the log</span></div><i>→</i>
+          <div class="box"><b>Socket down</b><span>history still loads, sends queue</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: the screen holds one channel window, not the whole history.</li>
@@ -891,7 +939,17 @@
         <li data-mode="single" data-opts="c-tag-gate:A tag manager we must gate*|c-tag-own:We own every script">Where do analytics tags live?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>HTML stub</b><i>→</i><b>Local record</b><i>→</i><b>Banner</b><i>→</i><b>Choice API</b><i>→</i><b>Tag gate</b>
+        <div class="flow-row">
+          <div class="box"><b>HTML stub</b><span>tiny, does not block first paint</span></div><i>→</i>
+          <div class="box"><b>Local record</b><span>so a refresh does not ask again</span></div><i>→</i>
+          <div class="box"><b>Banner</b><span>reject is as easy as accept</span></div><i>→</i>
+          <div class="box"><b>Tag gate</b><span>analytics and marketing wait for yes</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>Choice API</b><span>idempotent for the same subject and version</span></div><i>→</i>
+          <div class="box"><b>Policy at the edge</b><span>region picks opt-in or opt-out</span></div><i>→</i>
+          <div class="box"><b>POST fails</b><span>keep the choice locally, do not start tags</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: tags sit behind the gate. The banner does not sit in the document flow.</li>
@@ -1022,7 +1080,17 @@
         <li data-mode="single" data-opts="b-card-share:Share the card with the issue list*|b-card-own:A board-only card">Share the card component?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>Board shell</b><i>→</i><b>Column window</b><i>→</i><b>Card</b><i>→</i><b>Rank API</b><i>→</i><b>Issue events</b>
+        <div class="flow-row">
+          <div class="box"><b>Board shell</b><span>owns the filter</span></div><i>→</i>
+          <div class="box"><b>Column window</b><span>its own cursor, not the whole board</span></div><i>→</i>
+          <div class="box"><b>Card</b><span>issue id, status, rank</span></div><i>→</i>
+          <div class="box"><b>Rank API</b><span>before-id and after-id</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>Issue events</b><span>patch the open windows</span></div><i>→</i>
+          <div class="box"><b>409 neighbors changed</b><span>refetch the window</span></div><i>→</i>
+          <div class="box"><b>Workflow rejects</b><span>card animates back</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: each column is its own list with its own cursor. The shell owns the filter.</li>
@@ -1153,7 +1221,17 @@
         <li data-mode="single" data-opts="s-combo-yes:The design system already has a combobox*|s-combo-no:We build the listbox">Do we already have a combobox?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>Search box</b><i>→</i><b>BFF</b><i>→</i><b>Tenant index</b><i>→</i><b>Authz</b><i>→</i><b>Hits</b>
+        <div class="flow-row">
+          <div class="box"><b>Search box</b><span>debounce, abort the previous query</span></div><i>→</i>
+          <div class="box"><b>BFF</b><span>suggest is tighter than full search</span></div><i>→</i>
+          <div class="box"><b>Tenant index</b><span>candidates, not a per-user copy</span></div><i>→</i>
+          <div class="box"><b>Authz</b><span>before any title leaves</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>Hits</b><span>the browser never sees the candidate list</span></div><i>→</i>
+          <div class="box"><b>Permission revoked</b><span>the next query drops the hit</span></div><i>→</i>
+          <div class="box"><b>Facet counts</b><span>also authorized, so they cannot leak a project</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: authz sits after the index and before the response. The browser never sees the candidate list.</li>
@@ -1285,7 +1363,17 @@
         <li data-mode="single" data-opts="i-virt-long:Virtualize only if the page is long*|i-virt-always:Always virtualize|i-virt-never:Do not virtualize">Do we virtualize the list?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>Event</b><i>→</i><b>Recipient resolve</b><i>→</i><b>Inbox row</b><i>→</i><b>Bell</b><i>→</i><b>List</b>
+        <div class="flow-row">
+          <div class="box"><b>Event</b><span>one human action</span></div><i>→</i>
+          <div class="box"><b>Recipient resolve</b><span>watchers, then preferences</span></div><i>→</i>
+          <div class="box"><b>Group</b><span>collapse before writing rows</span></div><i>→</i>
+          <div class="box"><b>Inbox row</b><span>fan-out for active users</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>Bell</b><span>count may lag</span></div><i>→</i>
+          <div class="box"><b>List</b><span>first page, mark-read is idempotent</span></div><i>→</i>
+          <div class="box"><b>Cold user</b><span>build the first page on open</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: grouping happens before the row is written, not in the React list.</li>
@@ -1411,7 +1499,17 @@
         <li data-mode="single" data-opts="f-virt-yes:Virtualize the list*|f-virt-no:Render the first page only">Do we virtualize?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>Activity event</b><i>→</i><b>Roll up</b><i>→</i><b>Active followers</b><i>→</i><b>Feed page</b><i>→</i><b>Authz</b>
+        <div class="flow-row">
+          <div class="box"><b>Activity event</b><span>not an audit log</span></div><i>→</i>
+          <div class="box"><b>Roll up</b><span>one page, many actions</span></div><i>→</i>
+          <div class="box"><b>Active followers</b><span>push only to people recently here</span></div><i>→</i>
+          <div class="box"><b>Feed page</b><span>ranked, cursor of score plus id</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>Authz on read</b><span>a revoke shows up on the next open</span></div><i>→</i>
+          <div class="box"><b>Everyone else</b><span>build the page when they open it</span></div><i>→</i>
+          <div class="box"><b>Hot author</b><span>switch that tenant to fan-in</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: roll-up happens before the card is stored. The list just renders cards.</li>
@@ -1538,7 +1636,17 @@
         <li data-mode="single" data-opts="n-list-yes:The design system has a listbox*|n-list-no:We build the listbox">Does the design system have a listbox?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
-        <b>Editor</b><i>→</i><b>Mention picker</b><i>→</i><b>Suggest API</b><i>→</i><b>Directory prefix</b><i>→</i><b>Authz</b>
+        <div class="flow-row">
+          <div class="box"><b>Editor</b><span>debounce, abort the last query</span></div><i>→</i>
+          <div class="box"><b>Mention picker</b><span>about eight hits, combobox</span></div><i>→</i>
+          <div class="box"><b>Suggest API</b><span>query, context, limit</span></div><i>→</i>
+          <div class="box"><b>Directory prefix</b><span>biased to people already here</span></div>
+        </div>
+        <div class="flow-row alt">
+          <div class="box"><b>Authz</b><span>only people who can see this page</span></div><i>→</i>
+          <div class="box"><b>Saved token</b><span>store the id, refresh the label</span></div><i>→</i>
+          <div class="box"><b>Suggest down</b><span>the editor still saves plain text</span></div>
+        </div>
       </div>
       <ul class="say-list">
         <li>While I draw: authz is on the suggest call. The picker never filters a full directory.</li>
