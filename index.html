@@ -151,7 +151,29 @@
     ol, ul { margin: 0 0 10px; padding-left: 1.2rem; }
     li { margin: 0 0 6px; }
     li::marker { color: var(--muted); }
-    .ask-list { background: var(--ask-bg); border-radius: 10px; padding: 10px 10px 4px 2rem; }
+    .ask-list { background: var(--ask-bg); border-radius: 10px; padding: 12px 12px 6px; list-style: none; }
+    .ask-list > li { margin: 0 0 12px; }
+    .q-text { margin: 0 0 8px; }
+    .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+    .opts button {
+      font: inherit;
+      font-size: 14px;
+      line-height: 1.3;
+      min-height: 40px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .opts button[aria-pressed="true"] {
+      background: var(--ask);
+      border-color: var(--ask);
+      color: #fff8ef;
+    }
+    .opts button:focus-visible { outline: 2px solid var(--say); outline-offset: 2px; }
+    [data-if][hidden] { display: none !important; }
     .say-list { background: var(--say-bg); border-radius: 10px; padding: 10px 10px 4px 2rem; }
     .assume, .pick {
       border-radius: 10px;
@@ -222,7 +244,7 @@
 <body>
   <header>
     <h1>System design, as I would say it</h1>
-    <p class="lede">One problem per tab. I ask one question, wait, and note the answer. Then I speak the lines under it. Tap an abbreviation for the full form. The minute marks are a soft guide, not a clock to chase. Swipe the tabs sideways on a phone.</p>
+    <p class="lede">One problem per tab. Beside each question, tap the answer the interviewer gave. One choice, or several, depending on the question. The lines below are already written for every combination and only the matching ones stay visible. Tap an abbreviation for the full form. The minute marks are a soft guide, not a clock to chase. Swipe the tabs sideways on a phone.</p>
     <div class="open">
       <p class="kicker">Once, at the start of the round</p>
       <p>I'll structure this as requirements and approach, then API and schema, component design and scalability, scale-up and failures, and a short wrap-up with tradeoffs. If I go too deep anywhere, please interrupt me. I want all five steps inside the hour.</p>
@@ -264,12 +286,12 @@
       <p class="when">About the first twelve minutes. I stay here until we agree the approach.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>Who builds a widget: our teams, marketplace partners, or a customer's own developers?</li>
-        <li>Where does it render: inside our products, on a third-party site, or both?</li>
-        <li>What may a widget do: show data, write back, open dialogs, or only display?</li>
-        <li>What scale should I design for: widgets per page, installs per tenant, and daily active users?</li>
-        <li>Does the widget act as the signed-in user, and which permissions can it hold?</li>
-        <li>Any hard bars for accessibility, internationalization, latency, or offline use?</li>
+        <li data-mode="multi" data-opts="w-who-teams:Our teams|w-who-partners:Marketplace partners*|w-who-customer:A customer's developers">Who builds a widget?</li>
+        <li data-mode="multi" data-opts="w-where-inside:Inside our products*|w-where-third:A third-party site|w-where-both:Both">Where does it render?</li>
+        <li data-mode="multi" data-opts="w-can-show:Show data*|w-can-write:Write back*|w-can-dialog:Open dialogs|w-can-display:Display only">What may a widget do?</li>
+        <li data-mode="single" data-opts="w-scale-few:1–3 widgets, one team|w-scale-tens:About 10 widgets on a busy page*|w-scale-large:Tens of widgets, a large tenant">What scale should I design for?</li>
+        <li data-mode="single" data-opts="w-perm-user:Acts as the signed-in user, scoped*|w-perm-admin:Only permissions an admin grants|w-perm-none:No permissions, display only">Which permissions can it hold?</li>
+        <li data-mode="multi" data-opts="w-bar-a11y:Accessibility*|w-bar-i18n:Internationalization|w-bar-latency:Interaction under about 200 ms*|w-bar-offline:Must work offline">Any hard bars?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -283,10 +305,29 @@
       <h4 class="say">What I would say</h4>
       <ul class="say-list">
         <li>A widget is a versioned bundle plus a manifest, installed on a host surface, rendered for the current user.</li>
+        <li data-if="w-who-teams">Our own teams ship it, so review can be stricter, and I still sandbox it so one widget cannot read the page.</li>
+        <li data-if="w-who-partners">Marketplace partners install it, so I treat the bundle as untrusted.</li>
+        <li data-if="w-who-customer">A customer's developers ship it, so the threat model is the same as a partner: untrusted code on a trusted page.</li>
+        <li data-if="w-who-partners+w-where-third w-who-customer+w-where-third">On a third-party site the frame gets no cookie and a public bridge origin. It cannot assume our page's content security policy.</li>
+        <li data-if="w-where-inside">It renders inside our product. The host owns the page, the slot, and the theme.</li>
+        <li data-if="w-where-third w-where-both">Where it also runs on a third-party site, the bridge checks origin on every message and the token is not our session cookie.</li>
+        <li data-if="w-can-show w-can-display">Most of the surface is read-only. The widget paints data the host already allowed.</li>
+        <li data-if="w-can-write">A few widgets write back. Each write carries an idempotency key so a retry does not double-apply.</li>
+        <li data-if="w-can-dialog">Dialogs and toasts go through the host. The widget asks. It does not open its own window over the page.</li>
+        <li data-if="w-can-display">Display only means no write method on the bridge at all.</li>
+        <li data-if="w-scale-few">Scale is small: one to three widgets on a page for one team. I still cap frames, and I do not build a marketplace control plane yet.</li>
+        <li data-if="w-scale-tens">A busy page holds about ten widgets. I lazy-mount them and cap how many frames stay live.</li>
+        <li data-if="w-scale-large">A large tenant can put tens of widgets on one page. Slots are virtualized, and frames that scroll away are unloaded.</li>
+        <li data-if="w-perm-user">The widget acts as the signed-in user, through a short-lived token scoped to this install and these permissions.</li>
+        <li data-if="w-perm-admin">It does not inherit the user. An admin grants a fixed permission set, and the token cannot grow past that.</li>
+        <li data-if="w-perm-none">It holds no permissions. The bridge has no data request, only resize and a static render.</li>
+        <li data-if="w-bar-a11y">Accessibility is on both sides of the frame: the host slot and the widget's own tree.</li>
+        <li data-if="w-bar-i18n">Copy and layout come from the host locale, including right-to-left, not from hard-coded strings in the bundle.</li>
+        <li data-if="w-bar-latency">Once loaded, a widget interaction stays under about two hundred milliseconds at the 95th percentile.</li>
+        <li data-if="w-bar-offline">On a flaky network the cached bundle still paints, and the data is labeled stale.</li>
         <li>The host owns navigation, theming, and permissions. The widget owns its own UI.</li>
-        <li>I would support view, resize, and a small set of host actions such as a toast or a dialog. I would not give it the DOM.</li>
-        <li>Non-functional: isolation, a performance budget per widget, accessibility on both sides of the frame, and a kill switch per version.</li>
-        <li>Edge cases: a widget that hangs, a widget that asks for a permission the user does not have, a resize loop, and a host navigating away mid-call.</li>
+        <li>I would support view, resize, and a small set of host actions. I would not give it the DOM.</li>
+        <li>Edge cases: a widget that hangs, a permission the user does not have, a resize loop, and a host navigating away mid-call.</li>
       </ul>
       <h4 class="say">Two approaches</h4>
       <ul class="say-list">
@@ -299,17 +340,24 @@
       <p class="when">About minute twelve to twenty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is this read-heavy, with a few writes, or do widgets mutate host data often?</li>
-        <li>Do widgets need live updates, or is a fresh load enough?</li>
-        <li>Should a widget keep working on a flaky network?</li>
+        <li data-mode="single" data-opts="w-rw-read:Mostly reads, a few writes*|w-rw-write:Writes are common">Is this read-heavy or write-heavy?</li>
+        <li data-mode="single" data-opts="w-live-load:A fresh load is enough|w-live-sse:Live updates*|w-live-poll:A short poll, a few seconds">Do widgets need live updates?</li>
+        <li data-mode="single" data-opts="w-net-flaky:Keep working on a flaky network*|w-net-online:Online only">Should it survive a flaky network?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
         <li>Manifest: id, semantic version, bundle URL, permissions asked, and the sandbox flags.</li>
         <li>Installation: host id, widget id, pinned version, and the admin's config.</li>
-        <li>Session: a short-lived token scoped to this user, this install, and these permissions. Not the user's cookie.</li>
-        <li>I would load the manifest and the session over REST. Live data, if we need it, is SSE from the host, not a socket per widget.</li>
-        <li>Writes carry an idempotency key. A retry must not double-apply.</li>
+        <li data-if="w-perm-user w-perm-admin">Session: a short-lived token scoped to this install. Not the user's cookie.</li>
+        <li data-if="w-perm-none">There is no session token. The frame loads the bundle and stops.</li>
+        <li data-if="w-live-load">I would load the manifest, the session, and the data over REST. A fresh load is enough. No stream.</li>
+        <li data-if="w-live-sse">I would load the manifest and the session over REST. Live data is server-sent events from the host, not a socket per widget.</li>
+        <li data-if="w-live-poll">I would poll the host every few seconds with a version token, and stop polling when the slot is off screen.</li>
+        <li data-if="w-rw-read w-can-write">Writes are rare. They carry an idempotency key. A retry must not double-apply.</li>
+        <li data-if="w-rw-write">Writes are common, so the bridge batches them and every call is idempotent.</li>
+        <li data-if="w-can-display+w-perm-none">The contract has no write and no data read. Only ready and resize.</li>
+        <li data-if="w-net-flaky">If the network drops, the cached bundle still renders and the data is labeled stale.</li>
+        <li data-if="w-net-online">If the network drops, the slot shows a quiet unavailable state. I do not invent stale numbers.</li>
         <li>Errors are a code plus a message the host can show. The widget never renders a raw stack.</li>
         <li>Lists inside a widget are cursor-paginated. I would not let a widget pull an unbounded feed into the frame.</li>
         <li>The bridge messages are typed: ready, resize, request, and result. I check the target origin on every message.</li>
@@ -319,15 +367,20 @@
       <p class="when">About minute twenty-two to forty-two. This is the long drawing section.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is the host one app, or several products sharing one widget runtime?</li>
-        <li>Do we already have a design system the widget should consume as tokens?</li>
+        <li data-mode="single" data-opts="w-host-one:One app*|w-host-many:Several products, one runtime">Is the host one app, or several products?</li>
+        <li data-mode="single" data-opts="w-tok-yes:We already have tokens*|w-tok-no:No design system yet">Should the widget consume design-system tokens?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>Host page</b><i>→</i><b>Widget slots</b><i>→</i><b>Bridge</b><i>→</i><b>Sandboxed iframe</b><i>→</i><b>BFF</b><i>→</i><b>Product APIs</b>
       </div>
       <ul class="say-list">
         <li>While I draw: the page never shares its DOM with the widget. The bridge is the only door.</li>
-        <li>I lazy-mount a widget when it nears the viewport, and I cap how many frames are live.</li>
+        <li data-if="w-host-one">One host app owns the slots. The runtime does not have to be shared yet.</li>
+        <li data-if="w-host-many">Several products share one widget runtime, so the bridge and the token shape are a platform, not a feature of one app.</li>
+        <li data-if="w-tok-yes">Theming arrives as design-system tokens. The widget does not ship its own color palette.</li>
+        <li data-if="w-tok-no">There is no design system yet, so the host passes a small token set: color, space, and type. The widget does not read host CSS.</li>
+        <li data-if="w-scale-few">With one to three widgets I still lazy-mount, and a hard cap is cheap insurance.</li>
+        <li data-if="w-scale-tens w-scale-large">I lazy-mount a widget when it nears the viewport, and I cap how many frames are live.</li>
         <li>I would not set both allow-scripts and allow-same-origin. Together they weaken the sandbox.</li>
         <li>State split: the host holds install and theme. The widget holds its own view state inside the frame.</li>
         <li>Cache: manifest and bundle on the CDN, session token in memory only, host config in memory with a short TTL.</li>
@@ -370,12 +423,12 @@
       <p class="when">About the first twelve minutes.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>Who consumes it: web only, or also mobile and email?</li>
-        <li>How many teams, and can a team fork a component or only contribute upstream?</li>
-        <li>Is theming one brand, or several products on the same components?</li>
-        <li>What is the accessibility bar, and do we support right-to-left and multiple languages?</li>
-        <li>Must components render on the server, and what is the bundle budget?</li>
-        <li>How painful may a breaking change be?</li>
+        <li data-mode="multi" data-opts="l-who-web:Web*|l-who-mobile:Mobile|l-who-email:Email">Who consumes it?</li>
+        <li data-mode="single" data-opts="l-team-one:One team, no forks|l-team-many:Many teams, contribute upstream*|l-team-fork:Many teams, forks allowed">How many teams, and may they fork?</li>
+        <li data-mode="single" data-opts="l-brand-one:One brand, density and color mode*|l-brand-many:Several products, each with tokens">Is theming one brand or several products?</li>
+        <li data-mode="multi" data-opts="l-bar-aa:WCAG AA, keyboard and screen reader*|l-bar-rtl:Right-to-left|l-bar-lang:Multiple languages">What is the accessibility and language bar?</li>
+        <li data-mode="single" data-opts="l-ssr-tight:Server render, a button under about 20 kB*|l-ssr-loose:Server render, no tight bundle cap|l-ssr-client:Client only">Server render, and what bundle budget?</li>
+        <li data-mode="single" data-opts="l-break-codemod:Codemod and one overlapping version*|l-break-long:Two majors supported for a long window|l-break-free:Breaking changes can ship immediately">How painful may a breaking change be?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -390,8 +443,24 @@
       <ul class="say-list">
         <li>The library is tokens plus primitives plus a few composed components. Docs and tests ship with it.</li>
         <li>The public API is props and tokens. Class names and DOM structure are not a contract.</li>
-        <li>I would not let every team publish a button. A new component needs a short proposal.</li>
-        <li>Non-functional: tree-shaking, server-safe imports, visual regression, and an accessibility check in CI.</li>
+        <li data-if="l-who-web">The first consumer is the web. Components stay free of platform APIs at import time.</li>
+        <li data-if="l-who-mobile">Mobile shares the tokens and the props. The web DOM is not the contract a native app implements.</li>
+        <li data-if="l-who-email">Email gets a separate, smaller set. I do not pretend a dialog works in a mail client.</li>
+        <li data-if="l-team-one">One team owns every component. Other teams file a request. They do not publish a button.</li>
+        <li data-if="l-team-many">Many teams contribute upstream. A new component needs a short proposal. Nobody forks the button.</li>
+        <li data-if="l-team-fork">Forks are allowed, so each fork is a named package with its own version. The shared button stays the default.</li>
+        <li data-if="l-brand-one">One brand. Density and color mode are tokens on a parent, not a second component set.</li>
+        <li data-if="l-brand-many">Several products share the components and pass their own token set. A product does not restyle with CSS overrides.</li>
+        <li data-if="l-bar-aa">The bar is WCAG AA: keyboard, focus, name, and contrast, checked in CI.</li>
+        <li data-if="l-bar-rtl">Layout flips for right-to-left. I do not hard-code left and right in a component.</li>
+        <li data-if="l-bar-lang">Strings come from the product, not from the component. A long translation cannot clip the control.</li>
+        <li data-if="l-ssr-tight l-ssr-loose">Imports are server-safe. Nothing touches window until the component mounts.</li>
+        <li data-if="l-ssr-tight">A button stays under about twenty kilobytes. A chart is a separate entry so the button page does not pay for it.</li>
+        <li data-if="l-ssr-loose">There is no tight cap, and I still split heavy components so a page pays only for what it renders.</li>
+        <li data-if="l-ssr-client">The consumer is client-only. I can touch window in the module, and I still avoid a huge shared bundle.</li>
+        <li data-if="l-break-codemod">A breaking change ships a codemod and one version where old and new overlap.</li>
+        <li data-if="l-break-long">Two majors stay supported. The older one gets fixes only, and the guide says when it ends.</li>
+        <li data-if="l-break-free">Breaking changes can ship in the next version. I still write the changelog, and I do not pretend it is additive.</li>
         <li>Edge cases: a token rename, a nested interactive control, reduced motion, and a consumer still on the previous major.</li>
       </ul>
       <h4 class="say">Two approaches</h4>
@@ -405,27 +474,32 @@
       <p class="when">About minute twelve to twenty-two. Here the API is the component contract, not only HTTP.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Do consumers install one package, or can they depend on a single component?</li>
-        <li>Do we need a runtime theme switch, or is theming build-time?</li>
-        <li>Is there an HTTP API at all, or only the package?</li>
+        <li data-mode="single" data-opts="l-pkg-one:One package*|l-pkg-each:One package per component">One package, or a package per component?</li>
+        <li data-mode="single" data-opts="l-theme-runtime:Theme can switch at runtime*|l-theme-build:Theme is fixed at build time">Runtime theme switch, or build-time?</li>
+        <li data-mode="single" data-opts="l-http-none:Only the package*|l-http-docs:A small docs catalog over HTTP">Is there an HTTP API?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
         <li>Tokens are data: color, space, type, radius, and motion. Components read variables, not hard-coded values.</li>
         <li>Each component has a typed props list, a version, and a deprecation note if a prop is leaving.</li>
-        <li>I would ship one entry point so deep imports do not become a private API.</li>
-        <li>Semantic versioning: fix is safe, feature is additive, major has a codemod.</li>
-        <li>The docs site is a small REST or static catalog of examples. It is not on the product's critical path.</li>
+        <li data-if="l-pkg-one">I would ship one entry point so a deep import does not become a private API.</li>
+        <li data-if="l-pkg-each">Each component is its own package, with a shared token package. A product installs only the buttons it uses.</li>
+        <li data-if="l-pkg-each+l-team-fork">A fork is another package, not a branch inside the shared one, so the default button stays installable.</li>
+        <li data-if="l-break-codemod l-break-long">Semantic versioning: a fix is safe, a feature is additive, and a major has a migration.</li>
+        <li data-if="l-break-free">Versions still increment, and a minor may break. The changelog is the contract.</li>
+        <li data-if="l-http-none">There is no product HTTP API. The contract is the package.</li>
+        <li data-if="l-http-docs">The docs site is a static catalog of examples. It is not on the product's critical path.</li>
         <li>Telemetry, if we collect it, is adoption counts per component version, not user content.</li>
-        <li>I would rather have no runtime CSS-in-JS on the critical path. Static CSS keeps server render cheap.</li>
+        <li data-if="l-theme-runtime l-ssr-tight l-ssr-loose">I would rather have no runtime CSS-in-JS on the critical path. Static CSS keeps server render cheap.</li>
+        <li data-if="l-theme-build">The theme is compiled into the CSS. Switching brand means a rebuild, not a variable flip.</li>
       </ul>
 
       <h3 id="library-comp">Component design and scalability</h3>
       <p class="when">About minute twenty-two to forty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>One design-system team, or each product squad contributing?</li>
-        <li>Are we wrapping this around an existing visual language, or starting clean?</li>
+        <li data-mode="single" data-opts="l-own-ds:One design-system team*|l-own-squads:Each product squad contributes">Who owns the library?</li>
+        <li data-mode="single" data-opts="l-start-wrap:Wrap an existing visual language*|l-start-clean:Start clean">Wrap an existing look, or start clean?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>Tokens</b><i>→</i><b>Primitives</b><i>→</i><b>Components</b><i>→</i><b>Product app</b><i>→</i><b>Docs and visual tests</b>
@@ -434,7 +508,12 @@
         <li>While I draw: products depend on the package. They do not copy the source.</li>
         <li>Primitives are button, text field, dialog. Composed pieces such as a picker sit on top and can lag a version.</li>
         <li>State stays inside the component unless the caller needs it. I would not force a global store.</li>
-        <li>Theme is a set of CSS variables on a parent. Switching color mode does not reload the app.</li>
+        <li data-if="l-theme-runtime">Theme is a set of CSS variables on a parent. Switching color mode does not reload the app.</li>
+        <li data-if="l-theme-build">Theme is baked in at build time. A color-mode switch is a different stylesheet, not a runtime store.</li>
+        <li data-if="l-own-ds">One design-system team reviews every addition. Product squads request. They do not merge a primitive alone.</li>
+        <li data-if="l-own-squads">Product squads contribute, and a design-system review is still required before a primitive is public.</li>
+        <li data-if="l-start-wrap">I wrap the visual language we already have. The first release matches today's button, then tokens replace the hard-coded values.</li>
+        <li data-if="l-start-clean">I start from tokens, not from a screenshot of the old button. Products opt in one surface at a time.</li>
         <li>I would code-split the docs, not the button. The button must be in the main bundle only if the page uses it.</li>
         <li>The bottleneck at scale is upgrade pain, not QPS. Codemods and visual diffs are the scale plan.</li>
         <li>CI runs accessibility checks and screenshot diffs per component. A contrast regression fails the build.</li>
@@ -473,12 +552,12 @@
       <p class="when">About the first twelve minutes. Conflict handling usually becomes the heart of this round.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>How many people edit the same doc at once, and is it text only or rich content?</li>
-        <li>Do we need comments, suggestions, and live cursors?</li>
-        <li>Must it work offline, or only while the socket is up?</li>
-        <li>How large is a document, and is there a permission difference between view and edit?</li>
-        <li>What latency do we want from keystroke to other people's screens?</li>
-        <li>Are there regions, data residency, or audit requirements?</li>
+        <li data-mode="single" data-opts="e-size-small:2–5 people, plain text|e-size-tens:Tens of people, rich text*|e-size-crowd:About 100 people, rich text">How many people, and plain text or rich?</li>
+        <li data-mode="multi" data-opts="e-feat-cursors:Live cursors*|e-feat-comments:Comments*|e-feat-suggest:Suggestions">Comments, suggestions, live cursors?</li>
+        <li data-mode="single" data-opts="e-off-yes:Offline edits sync later*|e-off-no:Only while the socket is up">Offline, or only while connected?</li>
+        <li data-mode="single" data-opts="e-doc-pages:A few pages, view and edit differ*|e-doc-long:Tens of thousands of blocks, view and edit differ|e-doc-open:Anyone who can open it can edit">How large, and who can edit?</li>
+        <li data-mode="single" data-opts="e-lat-100:Under about 100 ms|e-lat-200:Under about 200 ms*|e-lat-1s:About a second is fine">Keystroke to other screens?</li>
+        <li data-mode="multi" data-opts="e-reg-one:One region*|e-reg-residency:Data stays in a chosen region|e-reg-audit:An audit log of edits">Regions, residency, or audit?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -492,8 +571,23 @@
       <h4 class="say">What I would say</h4>
       <ul class="say-list">
         <li>A document is a list of blocks. Text inside a block is the part we merge. Images and tables are blocks with their own ids.</li>
-        <li>Cursors and presence are ephemeral. They are not part of the saved document.</li>
-        <li>Comments anchor to a stable id inside the text, not to a character offset that drifts.</li>
+        <li data-if="e-size-small">Plain text, a handful of editors. A CRDT is still the merge, and the DOM can be the whole doc.</li>
+        <li data-if="e-size-tens">Rich text, tens of editors. I virtualize blocks and I batch remote paints to a frame.</li>
+        <li data-if="e-size-crowd">About a hundred people in one doc. Presence is sampled, and viewers who cannot edit do not sit on the full op fan-out.</li>
+        <li data-if="e-feat-cursors">Cursors and presence are ephemeral. They are not part of the saved document.</li>
+        <li data-if="e-feat-comments">Comments anchor to a stable id inside the text, not to a character offset that drifts.</li>
+        <li data-if="e-feat-suggest">A suggestion is an op the author can accept. Until then it is visible and it is not the document.</li>
+        <li data-if="e-off-yes">Offline edits sit locally and sync later. The user can see they have not reached anyone else yet.</li>
+        <li data-if="e-off-no">There is no offline log. If the socket is down, typing is disabled and I say we will reconnect.</li>
+        <li data-if="e-doc-pages e-doc-long">View and edit are different permissions, checked on the server for every change.</li>
+        <li data-if="e-doc-long">A long doc opens from a snapshot plus a window of blocks. I do not build the whole DOM.</li>
+        <li data-if="e-doc-open">Anyone who can open the doc can edit. I still check that they can open it, on every op.</li>
+        <li data-if="e-lat-100">Other people should see a keystroke within about a hundred milliseconds on a healthy network. I paint my own character immediately.</li>
+        <li data-if="e-lat-200">Other people should see a keystroke within about two hundred milliseconds. My own character paints before the round trip.</li>
+        <li data-if="e-lat-1s">About a second is acceptable for other screens. I still paint locally first so my typing never waits.</li>
+        <li data-if="e-reg-one">One region is enough. I do not split the op log across continents.</li>
+        <li data-if="e-reg-residency">The snapshot and the op log stay in the region we chose for that tenant.</li>
+        <li data-if="e-reg-audit">An audit log records who changed the doc and when. It is not the CRDT payload itself.</li>
         <li>Non-functional: merge without data loss, permission checks on the server, and a snapshot so we do not replay the full history on open.</li>
         <li>Edge cases: two people delete the same word, a comment on text that was cut, offline edits that overlap, and a viewer who must not receive the ops.</li>
       </ul>
@@ -508,19 +602,23 @@
       <p class="when">About minute twelve to twenty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is the hot path the live op stream, with snapshots as the cold path?</li>
-        <li>Should presence share the document socket or stay separate?</li>
-        <li>How long may a client be offline before we ask them to reload?</li>
+        <li data-mode="single" data-opts="e-hot-live:Live op stream, snapshots are cold*|e-hot-snap:Snapshots only, no live ops">What is the hot path?</li>
+        <li data-mode="single" data-opts="e-pres-side:Presence on its own channel*|e-pres-same:Presence on the document socket">Where does presence go?</li>
+        <li data-mode="single" data-opts="e-gap-min:A few minutes offline, then reload*|e-gap-hours:Hours offline, then merge|e-gap-none:No offline window">How long may a client be offline?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
         <li>Document: id, ACL, snapshot version, and title. Title uses a version number, not the CRDT.</li>
-        <li>Op: document id, client id, a CRDT id, and the payload. The server stores it and fans it out. It does not rewrite it.</li>
-        <li>Open is REST: snapshot plus the ops since that snapshot. Live edits are a WebSocket.</li>
-        <li>I would not put cursors on that same durable log. Presence is a side channel with a short TTL.</li>
-        <li>If the socket drops, the client resumes from the last op id. If it is too far behind, it fetches a new snapshot.</li>
-        <li>A save from offline is a batch of ops with client ids, so a retry is idempotent.</li>
-        <li>The server rejects an op when the user lost edit permission, even if they loaded the doc earlier.</li>
+        <li data-if="e-hot-live">Op: document id, client id, a CRDT id, and the payload. The server stores it and fans it out. It does not rewrite it.</li>
+        <li data-if="e-hot-live">Open is REST: snapshot plus the ops since that snapshot. Live edits are a WebSocket.</li>
+        <li data-if="e-hot-snap">There is no op stream. The client sends a new snapshot, and last-write-wins on the version number. Two editors can lose a paragraph.</li>
+        <li data-if="e-pres-side">I would not put cursors on the durable log. Presence is a side channel with a short time to live.</li>
+        <li data-if="e-pres-same">Presence shares the document socket and is marked ephemeral, so a replay of the log skips it.</li>
+        <li data-if="e-off-yes+e-gap-min">If the socket drops, the client resumes from the last op id. After a few minutes it fetches a new snapshot.</li>
+        <li data-if="e-off-yes+e-gap-hours">A client can be offline for hours. It sends a batch of ops with client ids, and the CRDT merges them.</li>
+        <li data-if="e-off-no e-gap-none">There is no offline batch. A dropped socket means reload from the latest snapshot.</li>
+        <li data-if="e-doc-pages e-doc-long">The server rejects an op when the user lost edit permission, even if they loaded the doc earlier.</li>
+        <li data-if="e-doc-open">The server rejects an op only when the user can no longer open the doc.</li>
         <li>Images upload to object storage. The document stores the id, not the bytes.</li>
       </ul>
 
@@ -528,8 +626,8 @@
       <p class="when">About minute twenty-two to forty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>One editor codebase, or several products embedding it?</li>
-        <li>Do comments and the doc canvas ship as one bundle?</li>
+        <li data-mode="single" data-opts="e-code-one:One editor codebase*|e-code-many:Several products embed it">One codebase, or several products?</li>
+        <li data-mode="single" data-opts="e-bundle-one:Comments and the canvas in one bundle*|e-bundle-split:Comments in a separate bundle">Do comments ship with the canvas?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>Editor shell</b><i>→</i><b>Block list</b><i>→</i><b>CRDT model</b><i>→</i><b>Op log</b><i>→</i><b>Snapshot store</b>
@@ -538,7 +636,12 @@
         <li>While I draw: the screen shows a window of blocks. The model can be larger than the DOM.</li>
         <li>Local typing updates the model first, then the socket. I do not wait for a round trip to paint my own character.</li>
         <li>Undo is a local stack of inverse ops, not a global undo that would surprise the other author.</li>
-        <li>Offline ops sit in IndexedDB and flush on reconnect. The UI shows they are pending.</li>
+        <li data-if="e-code-one">One editor codebase owns the model and the shell.</li>
+        <li data-if="e-code-many">Several products embed the same editor. The shell is theirs. The model and the op format are shared.</li>
+        <li data-if="e-bundle-one">Comments and the canvas ship together, so an anchor and a highlight stay in one version.</li>
+        <li data-if="e-bundle-split">The canvas loads first. Comments load when the user opens them, and they speak the same anchor ids.</li>
+        <li data-if="e-off-yes">Offline ops sit in IndexedDB and flush on reconnect. The UI shows they are pending.</li>
+        <li data-if="e-off-no">Nothing is queued. A dead socket disables the caret until it returns.</li>
         <li>I virtualize blocks so a long page does not create thousands of nodes.</li>
         <li>The bottleneck is applying a burst of remote ops on the main thread. I batch paints to a frame.</li>
         <li>I would watch op apply time, socket lag, and failed permission checks, with an SLO on keystroke latency.</li>
@@ -578,12 +681,12 @@
       <p class="when">About the first twelve minutes.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>Is this workspace chat: channels, direct messages, and threads?</li>
-        <li>What scale: people per workspace, messages per channel, concurrent connections?</li>
-        <li>Do we need presence, typing, reactions, and file attachments?</li>
-        <li>Is history searchable in this design, or is search a later system?</li>
-        <li>Offline sends, or only live while connected?</li>
-        <li>Any end-to-end encryption, retention, or audit requirement?</li>
+        <li data-mode="multi" data-opts="m-kind-channel:Channels*|m-kind-dm:Direct messages*|m-kind-thread:Threads*">Channels, direct messages, threads?</li>
+        <li data-mode="single" data-opts="m-scale-small:Under about 100 people|m-scale-company:Thousands of people, long channels*|m-scale-large:Tens of thousands, very long channels">What scale?</li>
+        <li data-mode="multi" data-opts="m-feat-presence:Presence*|m-feat-typing:Typing*|m-feat-react:Reactions*|m-feat-file:File attachments*">Presence, typing, reactions, files?</li>
+        <li data-mode="single" data-opts="m-search-later:Search is a later system*|m-search-now:Search is in this design">Is history searchable here?</li>
+        <li data-mode="single" data-opts="m-off-queue:Queue a send for a few minutes*|m-off-live:Only while connected">Offline sends?</li>
+        <li data-mode="multi" data-opts="m-pol-retain:Retention*|m-pol-audit:Audit|m-pol-e2e:End-to-end encryption">Retention, audit, or encryption?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -596,9 +699,24 @@
       </div>
       <h4 class="say">What I would say</h4>
       <ul class="say-list">
-        <li>A channel is an ordered log. A thread is a log with a parent message id.</li>
+        <li data-if="m-kind-channel m-kind-dm">A channel is an ordered log. A direct message is a channel with two members.</li>
+        <li data-if="m-kind-thread">A thread is a log with a parent message id.</li>
         <li>The client generates the message id so a retry cannot post twice.</li>
         <li>Unread state and the log are server-owned. The UI may paint ahead, then reconcile.</li>
+        <li data-if="m-scale-small">A small workspace can keep a short page in memory. I still page history.</li>
+        <li data-if="m-scale-company">Thousands of people and long channels. The screen holds one window, and the list is virtualized.</li>
+        <li data-if="m-scale-large">Tens of thousands of people. Fan-out of a hot channel is sharded, and presence is sampled.</li>
+        <li data-if="m-feat-presence m-feat-typing">Presence and typing are best-effort. Losing them is fine. Losing a message is not.</li>
+        <li data-if="m-feat-react">A reaction is a small write on the message id, idempotent per user and emoji.</li>
+        <li data-if="m-feat-file">A file uploads to object storage. The message stores the id, and the scan finishes before the file is downloadable.</li>
+        <li data-if="m-search-later">Search is a follower index. It is not on the send path.</li>
+        <li data-if="m-search-now">Search is in this design: the send path still only writes the log, and an indexer reads it.</li>
+        <li data-if="m-off-queue">A client may queue a send for a few minutes. It is not a full offline product.</li>
+        <li data-if="m-off-live">If the socket is down, send is disabled. I do not queue.</li>
+        <li data-if="m-pol-retain">Retention deletes or tombstones messages after the policy window. The sequence still has a gap the client can skip.</li>
+        <li data-if="m-pol-audit">An audit log records who posted and who exported. It is separate from the channel log.</li>
+        <li data-if="m-pol-e2e">End-to-end encryption means the server cannot search or meet a content audit. I would say that tradeoff out loud before I pick it.</li>
+        <li data-if="m-pol-e2e+m-search-now">Search and end-to-end encryption do not both work. I would keep search and drop encryption, unless they insist, in which case search is only on the device.</li>
         <li>Non-functional: order per channel, reconnect without a gap or a duplicate, and a virtualized list so a long channel stays cheap.</li>
         <li>Edge cases: send during a reconnect, two devices on one user, a message deleted while visible, and a channel the user just lost access to.</li>
       </ul>
@@ -613,17 +731,25 @@
       <p class="when">About minute twelve to twenty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Read-heavy history, write-light sends. Does that match how you see it?</li>
-        <li>Should typing and presence be durable at all?</li>
-        <li>How should we paginate: newest window first?</li>
+        <li data-mode="single" data-opts="m-rw-read:Read-heavy history, write-light sends*|m-rw-hot:Sends are as hot as reads">Read-heavy or write-hot?</li>
+        <li data-mode="single" data-opts="m-ephem-yes:Typing and presence are not durable*|m-ephem-no:They must be durable">Should typing and presence be durable?</li>
+        <li data-mode="single" data-opts="m-page-new:Newest window first*|m-page-old:Oldest window first">How should we paginate?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
         <li>Message: client UUID, channel id, optional thread id, body, server sequence, and time.</li>
         <li>Membership and unread cursors are their own resources. I do not hide them inside the message.</li>
         <li>GET history with a cursor. POST message with the client id as the idempotency key.</li>
-        <li>The socket emits message created, message updated, and a resume token. Typing is a separate ephemeral event, throttled.</li>
-        <li>Presence is a heartbeat with a TTL around half a minute. I would not store it next to messages.</li>
+        <li data-if="m-page-new">The first page is the newest window. Older history is the next cursor.</li>
+        <li data-if="m-page-old">The first page is the oldest window. New messages append, and a long channel still virtualizes.</li>
+        <li data-if="m-rw-read">History is the hot read. Sends are few compared with opens, so the log is optimized for the latest page.</li>
+        <li data-if="m-rw-hot">Sends are as hot as reads, so the write path is sharded by channel and the latest page stays cached.</li>
+        <li data-if="m-ephem-yes">The socket emits message created and a resume token. Typing is a separate ephemeral event, throttled.</li>
+        <li data-if="m-ephem-yes">Presence is a heartbeat with a time to live around half a minute. I would not store it next to messages.</li>
+        <li data-if="m-ephem-no">Typing and presence are stored, so a reconnect can restore them. That write rate needs its own store, not the message log.</li>
+        <li data-if="m-feat-file">Attachments upload first. The message references the file id.</li>
+        <li data-if="m-off-queue">The outbox keeps a pending send across a refresh for those few minutes.</li>
+        <li data-if="m-off-live">There is no outbox. A failed send stays on screen until the user retries while connected.</li>
         <li>Errors: a 409 on a duplicate client id returns the original message. A 403 means drop it from the outbox and say it was not allowed.</li>
         <li>Attachments upload first. The message references the file id.</li>
         <li>I would not put message bodies in a push payload. The push carries an id, and the client fetches.</li>
@@ -633,8 +759,8 @@
       <p class="when">About minute twenty-two to forty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>One web app, or also a desktop shell around the same client?</li>
-        <li>Is the message list virtualized from day one?</li>
+        <li data-mode="single" data-opts="m-shell-web:One web app*|m-shell-desk:A desktop shell around the same client">One web app, or a desktop shell too?</li>
+        <li data-mode="single" data-opts="m-virt-yes:Virtualize from day one*|m-virt-no:Short channels, virtualize later">Virtualize the message list?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>Channel list</b><i>→</i><b>Message window</b><i>→</i><b>Outbox</b><i>→</i><b>REST history</b><i>→</i><b>WebSocket</b>
@@ -642,8 +768,11 @@
       <ul class="say-list">
         <li>While I draw: the screen holds one channel window, not the whole history.</li>
         <li>Sending paints the bubble immediately with a pending mark, then replaces it when the server sequence arrives.</li>
-        <li>The outbox lives in memory and in IndexedDB so a refresh does not lose a pending send.</li>
-        <li>I virtualize rows. Images and link previews lazy-load.</li>
+        <li data-if="m-shell-web">One web app owns the channel list and the window.</li>
+        <li data-if="m-shell-desk">A desktop shell wraps the same client. The outbox and the socket live in the client, not in the shell.</li>
+        <li data-if="m-virt-yes">I virtualize rows from day one. Images and link previews lazy-load.</li>
+        <li data-if="m-virt-no">Short channels render the page. I virtualize once a channel can grow past a screen or two.</li>
+        <li data-if="m-off-queue">The outbox lives in memory and in IndexedDB so a refresh does not lose a pending send.</li>
         <li>If the socket falls behind, I resync from REST instead of applying a huge burst on the main thread.</li>
         <li>Cache: the latest page of the open channel in memory, older pages discarded as you scroll away.</li>
         <li>I would watch send latency, reconnect gaps, and duplicate rate, with an SLO on time-to-first-message for the open channel.</li>
@@ -683,12 +812,12 @@
       <p class="when">About the first twelve minutes. This problem is won on scope and on not hurting the page.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>Which regions, and is consent opt-in, opt-out, or both depending on the region?</li>
-        <li>What categories: strictly necessary, functional, analytics, marketing?</li>
-        <li>Who is the user: anonymous visitor, signed-in account, or both?</li>
-        <li>Must reject be as easy as accept, and can they change their mind later?</li>
-        <li>What may we set before a choice, and what scripts must wait?</li>
-        <li>Any budget for LCP, CLS, and the size of the consent code?</li>
+        <li data-mode="multi" data-opts="c-reg-eu:EU, opt-in*|c-reg-us:US, opt-out|c-reg-other:Other regions, follow the stricter rule">Which regions, and opt-in or opt-out?</li>
+        <li data-mode="multi" data-opts="c-cat-nec:Strictly necessary*|c-cat-fn:Functional|c-cat-an:Analytics*|c-cat-mk:Marketing">Which categories?</li>
+        <li data-mode="multi" data-opts="c-user-anon:Anonymous visitor*|c-user-auth:Signed-in account*">Who is the user?</li>
+        <li data-mode="single" data-opts="c-rej-easy:Reject is as easy as accept, and they can change later*|c-rej-once:Reject is as easy, and the choice is final|c-rej-settings:Banner is accept or reject, later changes live in settings">Reject versus accept, and can they change later?</li>
+        <li data-mode="single" data-opts="c-pre-nec:Only strictly necessary before a choice*|c-pre-fn:Necessary and functional before a choice">What may we set before a choice?</li>
+        <li data-mode="single" data-opts="c-bud-tight:Tiny consent code, no layout shift*|c-bud-loose:A larger banner is acceptable">Budget for the consent code?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -702,6 +831,23 @@
       <h4 class="say">What I would say</h4>
       <ul class="say-list">
         <li>Consent is a record: who or which device, which policy version, which region, which categories, and when.</li>
+        <li data-if="c-reg-eu">In the EU the default is opt-in. Analytics and marketing stay off until they say yes.</li>
+        <li data-if="c-reg-us">In the US the default can be opt-out. The banner still offers reject, and I record the choice.</li>
+        <li data-if="c-reg-other">For any other region I follow the stricter rule we already implement, which is opt-in.</li>
+        <li data-if="c-reg-eu+c-reg-us">The region on the request picks the default. One banner component, two policies.</li>
+        <li data-if="c-cat-nec">Strictly necessary covers the session, the load balancer, and storing this choice.</li>
+        <li data-if="c-cat-fn">Functional cookies wait for a yes unless they told me functional may run early.</li>
+        <li data-if="c-cat-an">Analytics tags stay behind the gate.</li>
+        <li data-if="c-cat-mk">Marketing tags stay behind the gate, and they are a separate yes from analytics.</li>
+        <li data-if="c-user-anon">An anonymous visitor is a device id, not an account.</li>
+        <li data-if="c-user-auth">A signed-in account stores the choice on the user, so the next device can inherit it.</li>
+        <li data-if="c-rej-easy">Reject is the same size and the same step as accept. They can change it later from the same banner.</li>
+        <li data-if="c-rej-once">Reject is as easy as accept, and I do not offer a later change in this design.</li>
+        <li data-if="c-rej-settings">The banner is accept or reject. A later change lives on a settings page, not a second banner.</li>
+        <li data-if="c-pre-nec">Before a choice, only strictly necessary cookies exist. Every other script waits.</li>
+        <li data-if="c-pre-fn">Necessary and functional may run before a choice. Analytics and marketing still wait.</li>
+        <li data-if="c-bud-tight">The consent code is tiny and inline. The banner does not shift the layout.</li>
+        <li data-if="c-bud-loose">A larger banner is acceptable. I still keep it out of the document flow so the page does not jump.</li>
         <li>The page ships a tiny gate. Non-essential tags do not run until that record says yes.</li>
         <li>Necessary cookies cover the session, the load balancer, and storing this choice. Nothing else.</li>
         <li>Non-functional: the gate is inline and small, the dialog is keyboard accessible, and a late policy fetch cannot block first paint.</li>
@@ -718,16 +864,19 @@
       <p class="when">About minute twelve to twenty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is the record anonymous until sign-in, and do we merge it after?</li>
-        <li>Do we need real time here at all?</li>
-        <li>Should the policy be cached at the edge?</li>
+        <li data-mode="single" data-opts="c-merge-yes:Anonymous until sign-in, then merge*|c-merge-auth:Always a signed-in account|c-merge-never:Never merge the anonymous record">Anonymous until sign-in, and do we merge?</li>
+        <li data-mode="single" data-opts="c-rt-no:No real time*|c-rt-yes:Push a policy change">Do we need real time?</li>
+        <li data-mode="single" data-opts="c-edge-yes:Cache the policy at the edge*|c-edge-no:Always ask the origin">Cache the policy at the edge?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
-        <li>Policy: version, region, categories, and the legal text URL. Cached on the CDN.</li>
-        <li>Record: subject id, policy version, region, choices map, timestamp, and source such as banner or GPC.</li>
-        <li>GET policy is cacheable. POST choice is idempotent for the same subject and version.</li>
-        <li>No WebSocket. This is a rare write. Polling would be wasteful.</li>
+        <li data-if="c-edge-yes">Policy: version, region, categories, and the legal text URL. Cached at the edge.</li>
+        <li data-if="c-edge-no">Policy: version, region, categories, and the legal text URL. Every load asks the origin. I would not cache a region rule that might have just changed.</li>
+        <li data-if="c-merge-yes">The record starts on a device id. After sign-in I merge it onto the account.</li>
+        <li data-if="c-merge-auth">There is no anonymous record. The choice is stored on the signed-in account.</li>
+        <li data-if="c-merge-never">The anonymous record stays on the device. Sign-in does not merge it.</li>
+        <li data-if="c-rt-no">No WebSocket. This is a rare write.</li>
+        <li data-if="c-rt-yes">A policy change is pushed. The stub refetches the policy and may ask again if the version moved.</li>
         <li>The stub reads a first-party cookie or local record so a refresh does not ask again.</li>
         <li>If POST fails, I keep the choice locally and retry. I do not start marketing tags until the post succeeds or the local record is enough for our policy. I would ask which of those you prefer. My default is: do not start tags until we have a stored yes.</li>
         <li>Signed-in merge is a POST that attaches the anonymous record to the account, once.</li>
@@ -738,14 +887,18 @@
       <p class="when">About minute twenty-two to forty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>One banner component across products, from the design system?</li>
-        <li>Do analytics tags live in a tag manager we must gate?</li>
+        <li data-mode="single" data-opts="c-ban-one:One design-system banner*|c-ban-many:Each product has its own banner">One banner across products?</li>
+        <li data-mode="single" data-opts="c-tag-gate:A tag manager we must gate*|c-tag-own:We own every script">Where do analytics tags live?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>HTML stub</b><i>→</i><b>Local record</b><i>→</i><b>Banner</b><i>→</i><b>Choice API</b><i>→</i><b>Tag gate</b>
       </div>
       <ul class="say-list">
         <li>While I draw: tags sit behind the gate. The banner does not sit in the document flow.</li>
+        <li data-if="c-ban-one">One design-system banner is used by every product. A product does not restyle the buttons.</li>
+        <li data-if="c-ban-many">Each product owns its banner. The record and the gate stay shared so a choice in one product is the choice.</li>
+        <li data-if="c-tag-gate">Analytics tags live in a tag manager. The gate is the only thing allowed to release them.</li>
+        <li data-if="c-tag-own">We own every script. Each one checks the local record before it runs. There is no tag manager to forget.</li>
         <li>The dialog traps focus, labels both buttons, and restores focus when it closes.</li>
         <li>I would not animate the banner in a way that moves layout. CLS stays near zero.</li>
         <li>Copy comes from the policy version so legal can change text without a client release, after the first paint.</li>
@@ -788,12 +941,12 @@
       <p class="when">About the first twelve minutes.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>Is a column a status, a swimlane, or something the user defines?</li>
-        <li>How many issues can sit on one board, and how many people move cards at once?</li>
-        <li>Do filters run on the client or on the server?</li>
-        <li>Is order inside a column meaningful, and can two people drag the same card?</li>
-        <li>Do we need live updates, offline edits, or both?</li>
-        <li>Any WIP limit, permission per issue, or accessibility requirement for drag and drop?</li>
+        <li data-mode="single" data-opts="b-col-status:A column is a status*|b-col-swim:A column is a swimlane|b-col-user:The user defines the columns">What is a column?</li>
+        <li data-mode="single" data-opts="b-scale-small:Under about 100 issues, a few people|b-scale-mid:Hundreds of issues, a few people dragging*|b-scale-large:Thousands of issues, many people at once">How many issues, and how many people move cards?</li>
+        <li data-mode="single" data-opts="b-filt-server:Filters run on the server*|b-filt-client:Filters run on the client">Where do filters run?</li>
+        <li data-mode="single" data-opts="b-rank-yes:Order matters, two people can drag the same card*|b-rank-no:Order inside a column does not matter">Is order meaningful?</li>
+        <li data-mode="single" data-opts="b-live-yes:Live updates*|b-live-off:Offline edits that sync later|b-live-both:Live updates and a short offline queue">Live updates, offline, or both?</li>
+        <li data-mode="multi" data-opts="b-bar-wip:A WIP limit|b-bar-perm:Permission per issue*|b-bar-a11y:Keyboard drag and drop*">WIP limit, permissions, accessibility?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -807,6 +960,22 @@
       <h4 class="say">What I would say</h4>
       <ul class="say-list">
         <li>The board is a query plus a window per column. The issue store remains the source of truth.</li>
+        <li data-if="b-col-status">A column is a status. A move is a workflow transition plus a rank.</li>
+        <li data-if="b-col-swim">A column is a swimlane, such as assignee or team. Status stays a field on the card.</li>
+        <li data-if="b-col-user">The user defines the columns. I store that definition on the board, not in the issue.</li>
+        <li data-if="b-scale-small">Under about a hundred issues I can still page, and a full load would be a shortcut I would not take.</li>
+        <li data-if="b-scale-mid">Hundreds of issues. Each column asks for a window. I do not load the project.</li>
+        <li data-if="b-scale-large">Thousands of issues and many people dragging. Windows stay small, and live events patch one card.</li>
+        <li data-if="b-filt-server">The filter runs on the server. The client sends it with the column query.</li>
+        <li data-if="b-filt-client">The filter runs on the client, so I only do that when the window is already the full match. Otherwise I move it to the server.</li>
+        <li data-if="b-rank-yes">Order matters. Rank is a key between neighbors, and two people can drag the same card. The loser refetches.</li>
+        <li data-if="b-rank-no">Order does not matter. A move only changes status. I do not store a rank.</li>
+        <li data-if="b-live-yes">Live issue events patch the open windows.</li>
+        <li data-if="b-live-off">Edits queue offline and sync later. The card shows pending until the server accepts the rank.</li>
+        <li data-if="b-live-both">Live events when connected, and a short queue when not. The queue flushes with the same rank key.</li>
+        <li data-if="b-bar-wip">A column can have a work-in-progress limit. The server rejects a drop that would pass it.</li>
+        <li data-if="b-bar-perm">Each issue has its own permission. A card I cannot move still renders, and the drop is rejected.</li>
+        <li data-if="b-bar-a11y">Drag and drop has a keyboard path: focus the card, pick the column, confirm. The pointer is not the only way.</li>
         <li>A move changes status, rank, or both. Rank is a key between neighbors so I do not renumber the column.</li>
         <li>I paint the drop immediately, then confirm. If the server disagrees, I put the card back and refetch that window.</li>
         <li>Non-functional: p95 move confirm under a few hundred milliseconds, no long task while dragging, and stable keyboard order.</li>
@@ -823,16 +992,22 @@
       <p class="when">About minute twelve to twenty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is the read path the column window, and the write path a single rank or transition call?</li>
-        <li>Do we push issue events, or is a short poll acceptable?</li>
-        <li>How fresh must a card be if someone edits it on the issue page?</li>
+        <li data-mode="single" data-opts="b-path-window:Read a column window, write one rank or transition*|b-path-all:The whole board in one payload">What is the read and write path?</li>
+        <li data-mode="single" data-opts="b-push-event:Push issue events*|b-push-poll:A short poll, a few seconds">Push events, or poll?</li>
+        <li data-mode="single" data-opts="b-fresh-1s:A card is fresh within about a second*|b-fresh-10s:Within about ten seconds|b-fresh-refresh:On the next refresh">How fresh must a card be?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
         <li>Board: id, filter, and the column definitions. It does not embed every issue.</li>
         <li>Card: issue id, summary, status, rank key, and the few fields the card paints.</li>
-        <li>GET a column with a cursor. POST a move with before-id, after-id, and an idempotency key.</li>
-        <li>I would use a WebSocket or SSE for issue-updated events that match this board's filter. Polling every second will not scale.</li>
+        <li data-if="b-path-window">GET a column window with a cursor. POST a move with before-id, after-id, and an idempotency key.</li>
+        <li data-if="b-path-all">GET returns the whole board. I would only accept that under about a hundred issues, and I would say it will not survive a large project.</li>
+        <li data-if="b-push-event">Issue events arrive on SSE or a WebSocket and patch the open windows.</li>
+        <li data-if="b-push-poll">A short poll, every few seconds, refetches the open windows. I do not poll every second.</li>
+        <li data-if="b-fresh-1s">A card edited on the issue page should show here within about a second.</li>
+        <li data-if="b-fresh-10s">A card can be about ten seconds stale. The poll or the event can wait that long.</li>
+        <li data-if="b-fresh-refresh">A card updates on the next refresh. I do not keep a live channel.</li>
+        <li data-if="b-rank-no">The move posts a status only. There is no before-id or after-id.</li>
         <li>A 409 means the neighbors changed. The client refetches the window instead of guessing a new rank.</li>
         <li>A 422 means the workflow rejected the status change. The card animates back.</li>
         <li>Filter changes cancel the in-flight windows and start over. I do not append a new filter onto old cards.</li>
@@ -843,14 +1018,18 @@
       <p class="when">About minute twenty-two to forty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is this one board experience, or embedded in several products?</li>
-        <li>Do we share the card component with the issue list?</li>
+        <li data-mode="single" data-opts="b-embed-one:One board experience*|b-embed-many:Embedded in several products">One board, or embedded in several products?</li>
+        <li data-mode="single" data-opts="b-card-share:Share the card with the issue list*|b-card-own:A board-only card">Share the card component?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>Board shell</b><i>→</i><b>Column window</b><i>→</i><b>Card</b><i>→</i><b>Rank API</b><i>→</i><b>Issue events</b>
       </div>
       <ul class="say-list">
         <li>While I draw: each column is its own list with its own cursor. The shell owns the filter.</li>
+        <li data-if="b-embed-one">One board experience owns the shell.</li>
+        <li data-if="b-embed-many">Several products embed the board. The column window and the rank call are shared. The shell is theirs.</li>
+        <li data-if="b-card-share">The card is the same component as the issue list, so a field change lands in both.</li>
+        <li data-if="b-card-own">The board has its own card. The issue list can move ahead without a board release.</li>
         <li>UI state, such as which card is grabbed, stays local. Server state is the issue cache, patched by id.</li>
         <li>I virtualize rows inside a column. Off-screen cards are not in the DOM.</li>
         <li>Optimistic state is marked so a slow confirm does not let me drag the same card again.</li>
@@ -893,12 +1072,12 @@
       <p class="when">About the first twelve minutes. I would name the permission rule before I talk about ranking.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>What is in the index: issues, pages, comments, attachments?</li>
-        <li>How large is a tenant, and what is the latency bar for typeahead versus a full results page?</li>
-        <li>If someone loses access, how fast must that hit disappear?</li>
-        <li>May we show "you cannot open this", or must a forbidden hit be invisible?</li>
-        <li>Do we need facets, filters, and highlighting?</li>
-        <li>Is ranking keyword, recency, or personal?</li>
+        <li data-mode="multi" data-opts="s-idx-issue:Issues*|s-idx-page:Pages*|s-idx-comment:Comments|s-idx-file:Attachments">What is in the index?</li>
+        <li data-mode="single" data-opts="s-lat-tight:Typeahead under about 100 ms, full page under about 300 ms*|s-lat-mid:Typeahead under about 300 ms, full page under about 1 s|s-lat-loose:A full page under a few seconds is enough">Latency for typeahead and the full page?</li>
+        <li data-mode="single" data-opts="s-rev-sec:A lost permission disappears within seconds*|s-rev-min:Within about a minute|s-rev-reindex:On the next reindex, minutes">How fast must a forbidden hit disappear?</li>
+        <li data-mode="single" data-opts="s-hide-yes:A forbidden hit is invisible*|s-hide-no:We may show that they cannot open it">May we show a hit they cannot open?</li>
+        <li data-mode="multi" data-opts="s-facet-yes:Facets*|s-filter-yes:Filters*|s-hl-yes:Highlighting*">Facets, filters, highlighting?</li>
+        <li data-mode="single" data-opts="s-rank-mix:Keyword plus recency*|s-rank-recency:Recency only|s-rank-personal:Personal, what I am likely to open">How do we rank?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -913,7 +1092,24 @@
       <ul class="say-list">
         <li>The client is not the place that enforces permissions. It only renders what the server already allowed.</li>
         <li>I would rather over-fetch candidates and filter them with a fresh permission check than trust a stale pre-filtered index.</li>
-        <li>Highlighting is computed on the server so we do not ship the whole document to bold a word.</li>
+        <li data-if="s-idx-issue">Issues are in the index.</li>
+        <li data-if="s-idx-page">Pages are in the index.</li>
+        <li data-if="s-idx-comment">Comments are in the index, and a comment hit links to the page or issue that holds it.</li>
+        <li data-if="s-idx-file">Attachments are in the index by name and extracted text, not by shipping the file to the browser.</li>
+        <li data-if="s-lat-tight">Typeahead stays under about a hundred milliseconds. The full page stays under about three hundred.</li>
+        <li data-if="s-lat-mid">Typeahead stays under about three hundred milliseconds. The full page can take up to about a second.</li>
+        <li data-if="s-lat-loose">A full page within a few seconds is enough. I still cancel the previous query when they keep typing.</li>
+        <li data-if="s-rev-sec">A lost permission disappears within seconds, so the check is at query time, not only at index time.</li>
+        <li data-if="s-rev-min">A lost permission can linger for about a minute. I still check at query time and I cache the decision briefly.</li>
+        <li data-if="s-rev-reindex">A lost permission waits for the next reindex, which can be minutes. I would name that lag before I accept it.</li>
+        <li data-if="s-hide-yes">A forbidden hit is invisible. I do not return a title they must not read.</li>
+        <li data-if="s-hide-no">I may show that a hit exists and they cannot open it. The title stays hidden.</li>
+        <li data-if="s-facet-yes">Facets come back with the page. A facet count is itself authorized, so it cannot reveal a private project.</li>
+        <li data-if="s-filter-yes">Filters are part of the query, applied before I fill the page.</li>
+        <li data-if="s-hl-yes">Highlighting is computed on the server so we do not ship the whole document to bold a word.</li>
+        <li data-if="s-rank-mix">Ranking is keyword plus recency.</li>
+        <li data-if="s-rank-recency">Ranking is recency. A newer hit beats a better keyword match.</li>
+        <li data-if="s-rank-personal">Ranking prefers what I am likely to open: recent views and people I work with, still after the permission check.</li>
         <li>Non-functional: tenant isolation, a short TTL on permission cache, and cancel-on-type in the UI.</li>
         <li>Edge cases: a user removed mid-session, a grant that changed an hour ago, a query that matches only forbidden docs, and a facet count that would reveal a private project.</li>
       </ul>
@@ -928,15 +1124,20 @@
       <p class="when">About minute twelve to twenty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Are suggest and full search two endpoints with different budgets?</li>
-        <li>How stale may the index be, in seconds?</li>
-        <li>Do we paginate with a cursor so ranking does not skip or repeat?</li>
+        <li data-mode="single" data-opts="s-ep-two:Suggest and full search, different budgets*|s-ep-one:One endpoint for both">Two endpoints or one?</li>
+        <li data-mode="single" data-opts="s-stale-sec:The index may be a few seconds behind*|s-stale-min:About a minute behind|s-stale-slow:Several minutes behind">How stale may the index be?</li>
+        <li data-mode="single" data-opts="s-cur-yes:An opaque cursor*|s-cur-page:Page numbers">How do we paginate?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
         <li>Query: text, types, filters, cursor, and a limit. Response: hits with id, type, title, snippet, rank, and the next cursor.</li>
-        <li>I would not return a score the user can use to infer hidden documents. The cursor is opaque.</li>
-        <li>Suggest is a tighter limit, no facets. Full search can include facets that were counted after authorization.</li>
+        <li data-if="s-cur-yes">I would not return a score the user can use to infer hidden documents. The cursor is opaque.</li>
+        <li data-if="s-cur-page">Page numbers are simpler and can skip or repeat when rank changes. I would say that before I use them.</li>
+        <li data-if="s-ep-two">Suggest is a tighter limit and a tighter latency budget. Full search can include facets.</li>
+        <li data-if="s-ep-one">One endpoint serves both. Suggest is the same call with a smaller limit.</li>
+        <li data-if="s-stale-sec">The index may be a few seconds behind the write.</li>
+        <li data-if="s-stale-min">The index may be about a minute behind.</li>
+        <li data-if="s-stale-slow">The index may be several minutes behind. Permission is still checked live so a revoke does not wait for that.</li>
         <li>REST is enough. I debounce and abort the previous request. A socket is not worth it for typing.</li>
         <li>The permission cache key includes a version. Deprovision bumps that version so old cache entries miss.</li>
         <li>If authorization filters too many hits, the server fetches another candidate batch before it returns a short page.</li>
@@ -948,14 +1149,19 @@
       <p class="when">About minute twenty-two to forty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is the box a global header, a page, or both sharing one client?</li>
-        <li>Do we already have a design-system combobox?</li>
+        <li data-mode="single" data-opts="s-box-both:A global header and a page, one client*|s-box-header:Header only|s-box-page:A results page only">Where does the box live?</li>
+        <li data-mode="single" data-opts="s-combo-yes:The design system already has a combobox*|s-combo-no:We build the listbox">Do we already have a combobox?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>Search box</b><i>→</i><b>BFF</b><i>→</i><b>Tenant index</b><i>→</i><b>Authz</b><i>→</i><b>Hits</b>
       </div>
       <ul class="say-list">
         <li>While I draw: authz sits after the index and before the response. The browser never sees the candidate list.</li>
+        <li data-if="s-box-both">The header and the results page share one client. The header is suggest. The page is full search.</li>
+        <li data-if="s-box-header">Only the header exists. There is no results page in this design.</li>
+        <li data-if="s-box-page">Only a results page exists. Typing navigates there. There is no header suggest.</li>
+        <li data-if="s-combo-yes">I use the design-system combobox. I do not build another listbox.</li>
+        <li data-if="s-combo-no">We build the listbox: keyboard, active descendant, and a status line for the count.</li>
         <li>The box waits about a hundred and fifty milliseconds after the last key, then sends. A new key aborts the last call.</li>
         <li>The list is a combobox: keyboard, active descendant, and a status line for result count.</li>
         <li>I keep server state for the result set and local state for the query text and highlight.</li>
@@ -998,12 +1204,12 @@
       <p class="when">About the first twelve minutes.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>Which events: comments, mentions, assignments, edits, or all of them?</li>
-        <li>Who receives one: the actor's watchers, the page watchers, or a team?</li>
-        <li>Do we collapse many edits of one page into a single row?</li>
-        <li>Channels in scope: in-app only, or email and push as well?</li>
-        <li>What is unread: a count, a dot, or a full list that must be exact?</li>
-        <li>Preferences, quiet hours, and how fast the bell must move?</li>
+        <li data-mode="multi" data-opts="i-ev-comment:Comments*|i-ev-mention:Mentions*|i-ev-assign:Assignments*|i-ev-edit:Edits">Which events?</li>
+        <li data-mode="single" data-opts="i-who-page:Page watchers*|i-who-actor:The actor's watchers|i-who-team:A team">Who receives one?</li>
+        <li data-mode="single" data-opts="i-roll-yes:Roll many edits of one page into one row*|i-roll-no:One row per event">Do we collapse edits?</li>
+        <li data-mode="multi" data-opts="i-ch-app:In-app*|i-ch-mail:Email|i-ch-push:Push">Which channels?</li>
+        <li data-mode="single" data-opts="i-un-count:A count that may lag*|i-un-dot:A dot|i-un-exact:A list that must be exact">What is unread?</li>
+        <li data-mode="multi" data-opts="i-pref-yes:Preferences*|i-pref-quiet:Quiet hours|i-bell-fast:The bell moves within about a second|i-bell-few:The bell can take a few seconds*">Preferences, quiet hours, and bell speed?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -1017,8 +1223,25 @@
       <h4 class="say">What I would say</h4>
       <ul class="say-list">
         <li>One human action becomes one event, then many recipient rows. That fan-out is the design.</li>
-        <li>I would group by a key such as page plus verb, so twenty edits do not become twenty rows.</li>
-        <li>Preferences are checked before I write the inbox row, not after the user opens the bell.</li>
+        <li data-if="i-ev-comment">A comment creates an event.</li>
+        <li data-if="i-ev-mention">A mention creates an event, and only if that person can see the page.</li>
+        <li data-if="i-ev-assign">An assignment creates an event.</li>
+        <li data-if="i-ev-edit">An edit creates an event.</li>
+        <li data-if="i-who-page">Recipients are the page watchers.</li>
+        <li data-if="i-who-actor">Recipients are the actor's watchers.</li>
+        <li data-if="i-who-team">Recipients are the team. I expand the team at write time.</li>
+        <li data-if="i-roll-yes">I group by page plus verb, so twenty edits become one row with a count.</li>
+        <li data-if="i-roll-no">Each event is its own row. I page the list so a noisy page does not become one endless screen.</li>
+        <li data-if="i-ch-app">The in-app inbox is the source of truth.</li>
+        <li data-if="i-ch-mail">Email is a worker on the same event, and only if the preference says so.</li>
+        <li data-if="i-ch-push">Push carries an id, not the title. The client fetches the row.</li>
+        <li data-if="i-un-count">Unread is a count, and it may lag the list.</li>
+        <li data-if="i-un-dot">Unread is a dot. I do not promise a number.</li>
+        <li data-if="i-un-exact">Unread is the list, and the count must match it. I do not paint a badge ahead of the read.</li>
+        <li data-if="i-pref-yes">Preferences are checked before I write the inbox row.</li>
+        <li data-if="i-pref-quiet">Quiet hours drop or delay the badge. The row can still be written for later.</li>
+        <li data-if="i-bell-fast">The bell should move within about a second for an active user.</li>
+        <li data-if="i-bell-few">The bell can take a few seconds. I would not poll every second to make it faster.</li>
         <li>Non-functional: mark-read is idempotent, the list is paged, and the badge does not poll every second.</li>
         <li>Edge cases: a watcher removed before delivery, a mention of someone who cannot see the page, a burst on a popular page, and mark-read on two devices.</li>
       </ul>
@@ -1033,16 +1256,21 @@
       <p class="when">About minute twelve to twenty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is the inbox read-heavy once we have paid the fan-out cost?</li>
-        <li>Do we push the badge, or is SSE enough?</li>
-        <li>Should mark-all-read be one call?</li>
+        <li data-mode="single" data-opts="i-rw-read:Read-heavy once fan-out is paid*|i-rw-hot:Reads are as hot as the fan-out">Is the inbox read-heavy?</li>
+        <li data-mode="single" data-opts="i-badge-sse:SSE is enough*|i-badge-push:Push the badge|i-badge-poll:Poll every few seconds">How does the badge move?</li>
+        <li data-mode="single" data-opts="i-all-one:Mark-all-read is one call*|i-all-each:One call per row">Mark-all-read?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
         <li>Notification: id, user id, group key, title, target URL, read time, and the rolled-up count.</li>
         <li>Preference: user id, event type, channel, and quiet hours.</li>
-        <li>GET inbox with a cursor. POST read on one id. POST read-all with a timestamp so a race does not mark a newer row.</li>
-        <li>The badge is a count endpoint or a push. I would use SSE or a WebSocket, not a one-second poll.</li>
+        <li data-if="i-all-one">POST read-all is one call with a timestamp, so a race does not mark a newer row.</li>
+        <li data-if="i-all-each">Mark-all-read is one call per visible row. I would not do that for a long inbox, and I would say so.</li>
+        <li data-if="i-badge-sse">The badge uses SSE. I do not poll every second.</li>
+        <li data-if="i-badge-push">The badge is a push. The payload is a count or an id, and the list is fetched on open.</li>
+        <li data-if="i-badge-poll">The badge polls every few seconds. I stop polling while the tab is hidden.</li>
+        <li data-if="i-rw-read">Once fan-out is paid, the inbox read is cheap and that is the path I optimize.</li>
+        <li data-if="i-rw-hot">Reads are as hot as the fan-out, so the inbox rows are cached per user and the first page is small.</li>
         <li>A repeat POST read returns the same row. The client can retry safely.</li>
         <li>If the user cannot see the target, I drop the notification rather than show a title they must not read.</li>
         <li>Email is not this API. A worker reads the same event and sends mail if the preference says so.</li>
@@ -1053,17 +1281,21 @@
       <p class="when">About minute twenty-two to forty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is the bell global chrome shared by every product?</li>
-        <li>Do we virtualize the list from the start?</li>
+        <li data-mode="single" data-opts="i-bell-global:Global chrome shared by every product*|i-bell-local:Each product has its own bell">Is the bell global chrome?</li>
+        <li data-mode="single" data-opts="i-virt-long:Virtualize only if the page is long*|i-virt-always:Always virtualize|i-virt-never:Do not virtualize">Do we virtualize the list?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>Event</b><i>→</i><b>Recipient resolve</b><i>→</i><b>Inbox row</b><i>→</i><b>Bell</b><i>→</i><b>List</b>
       </div>
       <ul class="say-list">
         <li>While I draw: grouping happens before the row is written, not in the React list.</li>
+        <li data-if="i-bell-global">The bell is global chrome. Every product shares it and the same inbox.</li>
+        <li data-if="i-bell-local">Each product has its own bell. The inbox store can still be shared.</li>
+        <li data-if="i-virt-long">I virtualize if the page is long. Most people only need the first screen.</li>
+        <li data-if="i-virt-always">I virtualize from the first row.</li>
+        <li data-if="i-virt-never">I do not virtualize. I keep the page short so the DOM stays small.</li>
         <li>Opening the bell fetches the first page. Mark-read paints immediately and reconciles the count.</li>
         <li>Local state is open-or-closed and which row is focused. Server state is the page and the count.</li>
-        <li>I virtualize if the page is long. Most people only need the first screen.</li>
         <li>A flag can disable a noisy event type without a deploy.</li>
         <li>The bottleneck is fan-out on a hot page, so I collapse the group before I write thousands of rows.</li>
         <li>I would watch fan-out time, badge lag, and mark-read errors, with an SLO on time-to-open the list.</li>
@@ -1103,12 +1335,12 @@
       <p class="when">About the first twelve minutes.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>Is this following people and spaces, or every update in the tenant?</li>
-        <li>Does following send mail, or is mail a separate watch?</li>
-        <li>What is a card: one action, or one page with the actions rolled up?</li>
-        <li>How do we rank: recency, popularity, or what I am likely to open?</li>
-        <li>What scale: cards per user per day, and how fresh is fresh?</li>
-        <li>Must every card be something I am allowed to open?</li>
+        <li data-mode="single" data-opts="f-scope-follow:People and spaces I follow*|f-scope-all:Every update in the tenant">Following, or every update?</li>
+        <li data-mode="single" data-opts="f-mail-sep:Mail is a separate watch*|f-mail-follow:Following also sends mail">Does following send mail?</li>
+        <li data-mode="single" data-opts="f-card-page:One page, actions rolled up*|f-card-action:One card per action">What is a card?</li>
+        <li data-mode="single" data-opts="f-rank-open:What I am likely to open*|f-rank-pop:Popularity|f-rank-new:Recency">How do we rank?</li>
+        <li data-mode="single" data-opts="f-scale-mid:Tens of cards a day, fresh within a minute*|f-scale-high:Hundreds of cards a day, fresh within a few seconds|f-scale-low:A handful of cards, fresh within about ten minutes">Cards per day, and how fresh?</li>
+        <li data-mode="single" data-opts="f-perm-yes:Every card is something I can open*|f-perm-no:A locked card can appear, with no title">Must I be allowed to open every card?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -1122,6 +1354,20 @@
       <h4 class="say">What I would say</h4>
       <ul class="say-list">
         <li>The feed is a ranked list of pages I am likely to care about, not an audit log.</li>
+        <li data-if="f-scope-follow">I only rank people and spaces I follow.</li>
+        <li data-if="f-scope-all">I rank updates from the whole tenant, and the permission check is what keeps it from becoming a firehose of secrets.</li>
+        <li data-if="f-mail-sep">Following does not send mail. Mail is a separate watch.</li>
+        <li data-if="f-mail-follow">Following also sends mail, so the same event has a mail worker and a feed card.</li>
+        <li data-if="f-card-page">A card is one page with the actions rolled up.</li>
+        <li data-if="f-card-action">A card is one action. I still cap how many cards one page can emit in a day.</li>
+        <li data-if="f-rank-open">Rank is what I am likely to open.</li>
+        <li data-if="f-rank-pop">Rank is popularity: likes, shares, and views, still after permission.</li>
+        <li data-if="f-rank-new">Rank is recency. Newer activity wins.</li>
+        <li data-if="f-scale-mid">Tens of cards a day, and fresh within about a minute is enough.</li>
+        <li data-if="f-scale-high">Hundreds of cards a day. Fresh within a few seconds means I push to active followers.</li>
+        <li data-if="f-scale-low">A handful of cards, and fresh within about ten minutes. Fan-in on read is enough.</li>
+        <li data-if="f-perm-yes">Every card is something I can open. A revoke removes it on the next read.</li>
+        <li data-if="f-perm-no">A locked card can appear with no title. I would rather not, and I only do it if they insist.</li>
         <li>I would roll activity up so a busy editor does not push the rest of the feed down.</li>
         <li>Permissions are checked when I read the feed, so a revoke is not stuck until a rebuild.</li>
         <li>Non-functional: stable cursor pagination, a first page that can come from cache, and no layout jump as counts update.</li>
@@ -1138,17 +1384,20 @@
       <p class="when">About minute twelve to twenty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is the hot path GET the next page of cards?</li>
-        <li>Do likes and views need to be live on the open card?</li>
-        <li>What is the cursor: score plus id, so a new insert does not skip rows?</li>
+        <li data-mode="single" data-opts="f-hot-page:GET the next page of cards*|f-hot-push:A live stream of new cards">What is the hot path?</li>
+        <li data-mode="single" data-opts="f-like-stale:Likes and views can be stale on the open card*|f-like-live:Likes and views update live">Do likes and views need to be live?</li>
+        <li data-mode="single" data-opts="f-cur-score:Cursor is score plus id*|f-cur-time:Cursor is time plus id">What is the cursor?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
         <li>Card: page id, title, space, actors, a rolled-up verb, a count, a score, and a cursor.</li>
         <li>Follow: user id and the target, which is a person or a space.</li>
-        <li>GET feed with a cursor. POST follow and DELETE follow. Those are rare writes.</li>
-        <li>I would not socket the whole feed. A refetch when I focus the tab is enough. Live counts can wait for the next page.</li>
-        <li>The cursor is opaque and ordered by score then id, so paging does not duplicate or skip.</li>
+        <li data-if="f-hot-page">The hot path is GET the next page. I would not socket the whole feed.</li>
+        <li data-if="f-hot-push">New cards are pushed to active clients. Opening the feed still uses GET for the page I missed.</li>
+        <li data-if="f-like-stale">Likes and views can be stale on the open card. They catch up on the next page.</li>
+        <li data-if="f-like-live">Likes and views on the open card update live, on a small channel, not by refetching the feed.</li>
+        <li data-if="f-cur-score">The cursor is score plus id, so a new insert does not skip a row.</li>
+        <li data-if="f-cur-time">The cursor is time plus id. Ranking by time makes the page stable and drops the personal score.</li>
         <li>If a card fails the permission check, I drop it and fill the page from the next candidates.</li>
         <li>Empty feed for a new user returns a small set of suggested spaces, clearly marked as suggestions, not as activity.</li>
         <li>Errors: a failed next page keeps the cards I have and offers retry. I do not blank the feed.</li>
@@ -1158,16 +1407,19 @@
       <p class="when">About minute twenty-two to forty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is the feed a home page, or a panel beside the page?</li>
-        <li>Do we virtualize the list?</li>
+        <li data-mode="single" data-opts="f-place-home:A home page*|f-place-panel:A panel beside the page">Home page, or a side panel?</li>
+        <li data-mode="single" data-opts="f-virt-yes:Virtualize the list*|f-virt-no:Render the first page only">Do we virtualize?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>Activity event</b><i>→</i><b>Roll up</b><i>→</i><b>Active followers</b><i>→</i><b>Feed page</b><i>→</i><b>Authz</b>
       </div>
       <ul class="say-list">
         <li>While I draw: roll-up happens before the card is stored. The list just renders cards.</li>
+        <li data-if="f-place-home">The feed is the home page. The first screen is the product.</li>
+        <li data-if="f-place-panel">The feed is a panel beside the page. It stays narrow and the page stays the product.</li>
+        <li data-if="f-virt-yes">I virtualize the list. Images on cards lazy-load.</li>
+        <li data-if="f-virt-no">I render the first page only. There is no virtualization until they ask for a longer scroll.</li>
         <li>The first page can paint from a short-lived cache, then revalidate. I label nothing as live if it is not.</li>
-        <li>I virtualize the list. Images on cards lazy-load.</li>
         <li>Follow and unfollow update local state immediately and reconcile. The next page uses the new follows.</li>
         <li>A flag can switch a tenant from hybrid fan-out to pure fan-in if a hot author is too expensive.</li>
         <li>The bottleneck is a popular author with many followers, so only active followers get a push.</li>
@@ -1208,12 +1460,12 @@
       <p class="when">About the first twelve minutes.</p>
       <h4 class="ask">Questions, one at a time</h4>
       <ol class="ask-list">
-        <li>Are we mentioning users, teams, or both?</li>
-        <li>Is the directory the whole tenant, or people already on this page or project?</li>
-        <li>How large is the directory, and what latency do we want after a keystroke?</li>
-        <li>Must every suggestion be someone who can see this page?</li>
-        <li>Keyboard only, or mouse as well, and what does the screen reader hear?</li>
-        <li>If suggest is down, can the editor still save plain text?</li>
+        <li data-mode="multi" data-opts="n-type-user:Users*|n-type-team:Teams*">Users, teams, or both?</li>
+        <li data-mode="single" data-opts="n-dir-context:People on this page or project first, then the directory*|n-dir-all:The whole tenant, no bias|n-dir-only:Only people already on this page">Where does the directory start?</li>
+        <li data-mode="single" data-opts="n-lat-tight:A large tenant, suggest under about 300 ms*|n-lat-fast:Suggest under about 100 ms|n-lat-ok:Suggest under about a second">Directory size and latency?</li>
+        <li data-mode="single" data-opts="n-see-yes:Only people who can see this page*|n-see-no:Anyone in the tenant, even if they cannot see it">Must they be able to see this page?</li>
+        <li data-mode="multi" data-opts="n-in-key:Keyboard*|n-in-mouse:Mouse*|n-in-sr:The screen reader hears the highlighted name*">Keyboard, mouse, screen reader?</li>
+        <li data-mode="single" data-opts="n-down-save:Suggest down, the editor still saves*|n-down-block:Suggest down, save waits">If suggest is down, can we still save?</li>
       </ol>
       <div class="assume">
         <p class="kicker">If they tell me to decide</p>
@@ -1227,6 +1479,21 @@
       <h4 class="say">What I would say</h4>
       <ul class="say-list">
         <li>A mention is a structured token: type, id, and a display label. It is not a string we hope still matches after a rename.</li>
+        <li data-if="n-type-user">A hit can be a user.</li>
+        <li data-if="n-type-team">A hit can be a team.</li>
+        <li data-if="n-dir-context">I bias toward people already on this page or project, then the rest of the directory.</li>
+        <li data-if="n-dir-all">I search the whole tenant with no bias. Permission still filters the list.</li>
+        <li data-if="n-dir-only">I only suggest people already on this page or project.</li>
+        <li data-if="n-lat-tight">A large tenant. Suggest stays under about three hundred milliseconds at the 95th percentile.</li>
+        <li data-if="n-lat-fast">Suggest stays under about a hundred milliseconds. I keep the limit small and I abort the previous query.</li>
+        <li data-if="n-lat-ok">Suggest under about a second is acceptable. I still debounce so I do not send every key.</li>
+        <li data-if="n-see-yes">I only suggest someone who can see this page.</li>
+        <li data-if="n-see-no">I can suggest anyone in the tenant. The insert still stores an id, and the page may hide a name they cannot see later.</li>
+        <li data-if="n-in-key">The keyboard can open, move, and choose.</li>
+        <li data-if="n-in-mouse">The mouse can choose as well.</li>
+        <li data-if="n-in-sr">The screen reader hears the highlighted name, not only that a list opened.</li>
+        <li data-if="n-down-save">If suggest is down, the editor still saves. I insert text and I do not block.</li>
+        <li data-if="n-down-block">If suggest is down, save waits. I would say that out loud, because it couples a picker to the document.</li>
         <li>I debounce, I abort the previous query, and I cap the list at about eight.</li>
         <li>The first paint can be recent mentions from this session. The server list replaces it when it returns.</li>
         <li>Non-functional: a combobox pattern, no request per key without a pause, and no download of the whole directory.</li>
@@ -1243,16 +1510,20 @@
       <p class="when">About minute twelve to twenty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is this read-only and very chatty, with a tight limit?</li>
-        <li>Do we need real time, or is a fresh query per pause enough?</li>
-        <li>How do we store the mention inside the document or the comment?</li>
+        <li data-mode="single" data-opts="n-chat-yes:Read-only, chatty, a tight limit*|n-chat-loose:Read-only, a larger limit is fine">How chatty, and how tight is the limit?</li>
+        <li data-mode="single" data-opts="n-rt-pause:A fresh query per pause*|n-rt-live:A live stream of matches">Real time, or a query per pause?</li>
+        <li data-mode="single" data-opts="n-store-id:Store the id, refresh the label*|n-store-text:Store the label text only">How do we store the mention?</li>
       </ol>
       <h4 class="say">Contract</h4>
       <ul class="say-list">
         <li>Suggest request: query, context id such as page or issue, types, and a limit.</li>
         <li>Hit: type, id, label, secondary text such as a team name, and whether they are already on this content.</li>
-        <li>REST, aborted when the query changes. No socket.</li>
-        <li>The saved body stores the id. The label is display-only and can be refreshed when we render.</li>
+        <li data-if="n-chat-yes">The limit is tight, about eight hits. This call is chatty, so I debounce and I abort.</li>
+        <li data-if="n-chat-loose">The limit can be larger, about twenty. I still debounce.</li>
+        <li data-if="n-rt-pause">A fresh query per pause is enough. REST, no socket.</li>
+        <li data-if="n-rt-live">Matches stream on a short-lived channel for the current query, and I close it when the query changes.</li>
+        <li data-if="n-store-id">The saved body stores the id. The label is display-only and can be refreshed when we render.</li>
+        <li data-if="n-store-text">The saved body stores the label text. A rename will not update old mentions.</li>
         <li>I start the request after a short pause, around a hundred and fifty milliseconds, and I skip an empty query.</li>
         <li>Cache key is user plus context plus query, in memory, for this session only.</li>
         <li>A stale response is ignored if its query is not the current one.</li>
@@ -1263,14 +1534,19 @@
       <p class="when">About minute twenty-two to forty-two.</p>
       <h4 class="ask">Questions</h4>
       <ol class="ask-list">
-        <li>Is this one picker used by the editor, comments, and Jira fields?</li>
-        <li>Does the design system already have a listbox?</li>
+        <li data-mode="multi" data-opts="n-use-editor:The editor*|n-use-comment:Comments*|n-use-jira:Jira fields*">Who uses this picker?</li>
+        <li data-mode="single" data-opts="n-list-yes:The design system has a listbox*|n-list-no:We build the listbox">Does the design system have a listbox?</li>
       </ol>
       <div class="flow" aria-label="Boxes to draw">
         <b>Editor</b><i>→</i><b>Mention picker</b><i>→</i><b>Suggest API</b><i>→</i><b>Directory prefix</b><i>→</i><b>Authz</b>
       </div>
       <ul class="say-list">
         <li>While I draw: authz is on the suggest call. The picker never filters a full directory.</li>
+        <li data-if="n-use-editor">The editor uses this picker.</li>
+        <li data-if="n-use-comment">Comments use this picker.</li>
+        <li data-if="n-use-jira">Jira fields use this picker. The context id is the issue.</li>
+        <li data-if="n-list-yes">The design system already has a listbox. I use it.</li>
+        <li data-if="n-list-no">We build the listbox. Arrow keys move, enter inserts, escape closes.</li>
         <li>The picker is a combobox. Arrow keys move, enter inserts, escape closes, and focus returns to the editor.</li>
         <li>I announce the count politely. I do not move screen-reader focus on every keystroke.</li>
         <li>Recent picks are local state. Results are server state for the current query.</li>
@@ -1464,6 +1740,95 @@
       tabs.find((tab) => tab.id === stored) ||
       tabs[0]
     select(initial)
+
+    const choiceKey = "sd-prep-choices"
+    const savedChoices = (() => {
+      try { return JSON.parse(sessionStorage.getItem(choiceKey) || "{}") } catch (err) { return {} }
+    })()
+
+    const selectedIn = (root) => {
+      const picked = new Set()
+      root.querySelectorAll(".opts button[aria-pressed='true']").forEach((button) => {
+        picked.add(button.dataset.opt)
+      })
+      return picked
+    }
+
+    const applyChoices = (root) => {
+      const picked = selectedIn(root)
+      root.querySelectorAll("[data-if]").forEach((node) => {
+        const clauses = node.dataset.if.trim().split(/\s+/)
+        const show = clauses.some((clause) =>
+          clause.split("+").every((opt) => picked.has(opt)),
+        )
+        node.hidden = !show
+      })
+    }
+
+    const remember = (article) => {
+      const picked = [...selectedIn(article)]
+      savedChoices[article.id] = picked
+      try { sessionStorage.setItem(choiceKey, JSON.stringify(savedChoices)) } catch (err) {}
+    }
+
+    document.querySelectorAll("li[data-opts]").forEach((item) => {
+      const mode = item.dataset.mode === "multi" ? "multi" : "single"
+      const question = item.textContent.trim()
+      const article = item.closest("article")
+      const stored = new Set(savedChoices[article?.id] || [])
+      item.textContent = ""
+      item.classList.add("q-row")
+      const text = document.createElement("p")
+      text.className = "q-text"
+      text.textContent = question
+      const group = document.createElement("div")
+      group.className = "opts"
+      group.setAttribute("role", mode === "multi" ? "group" : "radiogroup")
+      group.setAttribute("aria-label", question)
+      const buttons = []
+      for (const part of item.dataset.opts.split("|")) {
+        const starred = part.endsWith("*")
+        const raw = starred ? part.slice(0, -1) : part
+        const splitAt = raw.indexOf(":")
+        const id = raw.slice(0, splitAt)
+        const label = raw.slice(splitAt + 1)
+        const button = document.createElement("button")
+        button.type = "button"
+        button.dataset.opt = id
+        button.textContent = label
+        const pressed = stored.size
+          ? stored.has(id)
+          : starred
+        button.setAttribute("aria-pressed", pressed ? "true" : "false")
+        buttons.push(button)
+        group.append(button)
+      }
+      if (!buttons.some((button) => button.getAttribute("aria-pressed") === "true") && buttons[0]) {
+        buttons[0].setAttribute("aria-pressed", "true")
+      }
+      const press = (button) => {
+        if (mode === "single") {
+          for (const other of buttons) {
+            other.setAttribute("aria-pressed", other === button ? "true" : "false")
+          }
+        } else {
+          const next = button.getAttribute("aria-pressed") !== "true"
+          button.setAttribute("aria-pressed", next ? "true" : "false")
+          if (!buttons.some((other) => other.getAttribute("aria-pressed") === "true")) {
+            button.setAttribute("aria-pressed", "true")
+          }
+        }
+        if (article) {
+          applyChoices(article)
+          remember(article)
+        }
+      }
+      for (const button of buttons) {
+        button.addEventListener("click", () => press(button))
+      }
+      item.append(text, group)
+      if (article) applyChoices(article)
+    })
   </script>
 </body>
 </html>
